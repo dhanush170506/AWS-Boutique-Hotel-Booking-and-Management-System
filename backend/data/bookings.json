@@ -1,0 +1,17 @@
+[
+  {
+    "bookingId": "BHB-DEMO2026",
+    "customerName": "Aarav Mehta",
+    "email": "aarav.mehta@example.com",
+    "phone": "+91 98765 43210",
+    "roomType": "Presidential Suite",
+    "guests": 2,
+    "checkInDate": "2026-07-12",
+    "checkOutDate": "2026-07-15",
+    "bedPreference": "King Bed",
+    "airportPickup": true,
+    "specialRequests": "Anniversary dinner setup with flowers.",
+    "bookingStatus": "Confirmed",
+    "createdAt": "2026-06-30T08:30:00.000Z"
+  }
+]

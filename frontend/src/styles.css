@@ -1,0 +1,63 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #090a0d;
+  color: #f8f5ef;
+}
+
+::selection {
+  background: rgba(216, 184, 102, 0.35);
+}
+
+.luxury-border {
+  border: 1px solid rgba(216, 184, 102, 0.22);
+}
+
+.glass-panel {
+  background: rgba(12, 13, 17, 0.76);
+  backdrop-filter: blur(18px);
+}
+
+.field {
+  @apply w-full rounded-none border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-ivory outline-none transition focus:border-champagne focus:ring-2 focus:ring-champagne/20;
+}
+
+.label {
+  @apply mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-champagne;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 bg-champagne px-6 py-3 text-sm font-bold uppercase tracking-[0.16em] text-midnight transition hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 border border-champagne/50 px-6 py-3 text-sm font-bold uppercase tracking-[0.16em] text-champagne transition hover:border-champagne hover:bg-champagne hover:text-midnight;
+}
+
+.page-shell {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+.fade-up {
+  animation: fadeUp 0.7s ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
