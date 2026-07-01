@@ -10,52 +10,54 @@ const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
-const PUBLIC_HOST = process.env.PUBLIC_HOST || "3.237.76.223";
-const allowedOrigins = new Set([
-  CLIENT_ORIGIN,
+const defaultAllowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "http://3.237.76.223",
   "http://3.237.76.223:5173",
-]);
+];
+const allowedOrigins = new Set(defaultAllowedOrigins);
 
 for (const origin of (process.env.CORS_ALLOWED_ORIGINS || "").split(",")) {
-  if (origin.trim()) allowedOrigins.add(origin.trim());
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (normalizedOrigin) allowedOrigins.add(normalizedOrigin);
+}
+
+function normalizeOrigin(origin) {
+  if (!origin || !origin.trim()) return "";
+  try {
+    const url = new URL(origin.trim());
+    return `${url.protocol}//${url.host}`;
+  } catch (_error) {
+    return "";
+  }
 }
 
 function isAllowedOrigin(origin) {
   if (!origin) return true;
-  if (allowedOrigins.has(origin)) return true;
-
-  try {
-    const { hostname } = new URL(origin);
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === PUBLIC_HOST
-    );
-  } catch (_error) {
-    return false;
-  }
+  return allowedOrigins.has(normalizeOrigin(origin));
 }
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      console.log("Incoming Origin:", origin);
+const corsOptions = {
+  origin(origin, callback) {
+    console.log(`[cors] Incoming Origin: ${origin || "none"}`);
 
-      if (isAllowedOrigin(origin)) {
-        callback(null, true);
-        return;
-      }
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
 
-      callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    optionsSuccessStatus: 204,
-  }),
-);
+    const error = new Error(`Not allowed by CORS: ${origin}`);
+    error.status = 403;
+    callback(error);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-user-id"],
+  optionsSuccessStatus: 204,
+};
+
+app.options("*", cors(corsOptions), (_req, res) => res.sendStatus(204));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -81,8 +83,7 @@ app.use((req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  const status =
-    err.status || (err.message === "Not allowed by CORS" ? 403 : 500);
+  const status = err.status || 500;
   res.status(status).json({
     message: err.message || "Unexpected server error",
   });
