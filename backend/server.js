@@ -5,6 +5,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const authRoutes = require("./routes/authRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
+const roomRoutes = require("./routes/roomRoutes");
 const userRoutes = require("./routes/userRoutes");
 
 const app = express();
@@ -31,7 +32,7 @@ app.get("/", (_req, res) => {
   res.json({
     service: "Boutique Hotel Booking API",
     status: "healthy",
-    storage: "mock-json",
+    storage: "dynamodb",
     awsReady: ["DynamoDB", "S3", "Lambda", "SNS", "SES", "EC2"],
   });
 });
@@ -39,6 +40,7 @@ app.get("/", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/rooms", roomRoutes);
 
 app.use((req, res) => {
   res

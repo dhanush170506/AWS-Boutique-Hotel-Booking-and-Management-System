@@ -1,8 +1,6 @@
-const fs = require("fs/promises");
-const path = require("path");
+const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require("uuid");
-
-const DATA_FILE = path.join(__dirname, "..", "data", "users.json");
+const { docClient, scanAll, tables } = require("../services/dynamoDb");
 
 const defaultPreferences = {
   bedPreference: "King Bed",
@@ -14,32 +12,52 @@ const defaultPreferences = {
 function publicUser(user) {
   if (!user) return null;
   const { password, ...safeUser } = user;
+  if (!safeUser.id && safeUser.userId) safeUser.id = safeUser.userId;
   return safeUser;
 }
 
 class UserStore {
-  constructor(filePath = DATA_FILE) {
-    this.filePath = filePath;
+  constructor(tableName = tables.users) {
+    this.tableName = tableName;
   }
 
   async findAll() {
-    return this.#read();
+    const users = await scanAll({
+      TableName: this.tableName,
+    });
+    return users.map(this.#normalizeUser);
   }
 
   async findById(userId) {
-    const users = await this.#read();
-    return users.find((user) => user.id === userId);
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { userId },
+      }),
+    );
+    return this.#normalizeUser(result.Item);
   }
 
   async findByEmail(email) {
-    const users = await this.#read();
-    return users.find((user) => user.email.toLowerCase() === email.toLowerCase());
+    const normalizedEmail = email.trim().toLowerCase();
+    const users = await scanAll({
+      TableName: this.tableName,
+      FilterExpression: "#email = :email",
+      ExpressionAttributeNames: {
+        "#email": "email",
+      },
+      ExpressionAttributeValues: {
+        ":email": normalizedEmail,
+      },
+    });
+    return this.#normalizeUser(users[0]);
   }
 
   async create(payload) {
-    const users = await this.#read();
+    const userId = `USR-${uuidv4().slice(0, 8).toUpperCase()}`;
     const user = {
-      id: `USR-${uuidv4().slice(0, 8).toUpperCase()}`,
+      userId,
+      id: userId,
       fullName: payload.fullName.trim(),
       email: payload.email.trim().toLowerCase(),
       phone: payload.phone.trim(),
@@ -51,43 +69,49 @@ class UserStore {
       createdAt: new Date().toISOString()
     };
 
-    users.unshift(user);
-    await this.#write(users);
+    await docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: user,
+        ConditionExpression: "attribute_not_exists(userId)",
+      }),
+    );
     return publicUser(user);
   }
 
   async update(userId, payload) {
-    const users = await this.#read();
-    const index = users.findIndex((user) => user.id === userId);
-    if (index === -1) return null;
+    const existing = await this.findById(userId);
+    if (!existing) return null;
 
-    users[index] = {
-      ...users[index],
-      fullName: payload.fullName?.trim() || users[index].fullName,
-      phone: payload.phone?.trim() || users[index].phone,
+    const updated = {
+      ...existing,
+      userId,
+      id: existing.id || userId,
+      fullName: payload.fullName?.trim() || existing.fullName,
+      phone: payload.phone?.trim() || existing.phone,
       preferences: {
-        ...users[index].preferences,
+        ...existing.preferences,
         ...(payload.preferences || {})
       },
       updatedAt: new Date().toISOString()
     };
 
-    await this.#write(users);
-    return publicUser(users[index]);
+    await docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: updated,
+      }),
+    );
+    return publicUser(updated);
   }
 
-  async #read() {
-    try {
-      const content = await fs.readFile(this.filePath, "utf8");
-      return JSON.parse(content);
-    } catch (error) {
-      if (error.code === "ENOENT") return [];
-      throw error;
-    }
-  }
-
-  async #write(users) {
-    await fs.writeFile(this.filePath, JSON.stringify(users, null, 2));
+  #normalizeUser(user) {
+    if (!user) return null;
+    return {
+      ...user,
+      id: user.id || user.userId,
+      userId: user.userId || user.id,
+    };
   }
 }
 

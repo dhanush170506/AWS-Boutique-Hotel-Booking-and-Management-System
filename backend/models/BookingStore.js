@@ -1,31 +1,41 @@
-const fs = require("fs/promises");
-const path = require("path");
+const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require("uuid");
-
-const DATA_FILE = path.join(__dirname, "..", "data", "bookings.json");
+const { docClient, scanAll, tables } = require("../services/dynamoDb");
 
 class BookingStore {
-  constructor(filePath = DATA_FILE) {
-    this.filePath = filePath;
+  constructor(tableName = tables.bookings) {
+    this.tableName = tableName;
   }
 
-  // This repository boundary is the intended swap point for DynamoDB later.
   async findAll() {
-    return this.#read();
+    const bookings = await scanAll({
+      TableName: this.tableName,
+    });
+    return this.#sortNewest(bookings);
   }
 
   async findById(bookingId) {
-    const bookings = await this.#read();
-    return bookings.find((booking) => booking.bookingId === bookingId);
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { bookingId },
+      }),
+    );
+    return result.Item || null;
   }
 
   async findByUser(userId) {
-    const bookings = await this.#read();
-    return bookings.filter((booking) => booking.userId === userId);
+    const bookings = await scanAll({
+      TableName: this.tableName,
+      FilterExpression: "userId = :userId",
+      ExpressionAttributeValues: {
+        ":userId": userId,
+      },
+    });
+    return this.#sortNewest(bookings);
   }
 
   async create(payload) {
-    const bookings = await this.#read();
     const booking = {
       bookingId: `BHB-${uuidv4().slice(0, 8).toUpperCase()}`,
       userId: payload.userId || null,
@@ -43,57 +53,65 @@ class BookingStore {
       createdAt: new Date().toISOString()
     };
 
-    bookings.unshift(booking);
-    await this.#write(bookings);
+    await docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: booking,
+        ConditionExpression: "attribute_not_exists(bookingId)",
+      }),
+    );
     return booking;
   }
 
   async update(bookingId, payload) {
-    const bookings = await this.#read();
-    const index = bookings.findIndex((booking) => booking.bookingId === bookingId);
-    if (index === -1) return null;
-    if (bookings[index].bookingStatus === "Cancelled") return { cancelled: true, booking: bookings[index] };
-    if (payload.userId && bookings[index].userId && bookings[index].userId !== payload.userId) return { forbidden: true };
+    const existing = await this.findById(bookingId);
+    if (!existing) return null;
+    if (existing.bookingStatus === "Cancelled") return { cancelled: true, booking: existing };
+    if (payload.userId && existing.userId && existing.userId !== payload.userId) return { forbidden: true };
 
-    bookings[index] = {
-      ...bookings[index],
+    const updated = {
+      ...existing,
       ...payload,
       bookingId,
-      userId: bookings[index].userId,
-      guests: payload.guests ? Number(payload.guests) : bookings[index].guests,
+      userId: existing.userId,
+      guests: payload.guests ? Number(payload.guests) : existing.guests,
       airportPickup:
         typeof payload.airportPickup === "boolean"
           ? payload.airportPickup
-          : bookings[index].airportPickup,
+          : existing.airportPickup,
       updatedAt: new Date().toISOString()
     };
 
-    await this.#write(bookings);
-    return bookings[index];
+    await docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: updated,
+      }),
+    );
+    return updated;
   }
 
   async cancel(bookingId) {
-    const bookings = await this.#read();
-    const index = bookings.findIndex((booking) => booking.bookingId === bookingId);
-    if (index === -1) return null;
+    const existing = await this.findById(bookingId);
+    if (!existing) return null;
 
-    bookings[index] = {
-      ...bookings[index],
+    const updated = {
+      ...existing,
       bookingStatus: "Cancelled",
       cancelledAt: new Date().toISOString()
     };
 
-    await this.#write(bookings);
-    return bookings[index];
+    await docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: updated,
+      }),
+    );
+    return updated;
   }
 
-  async #read() {
-    const content = await fs.readFile(this.filePath, "utf8");
-    return JSON.parse(content);
-  }
-
-  async #write(bookings) {
-    await fs.writeFile(this.filePath, JSON.stringify(bookings, null, 2));
+  #sortNewest(bookings) {
+    return bookings.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   }
 }
 
