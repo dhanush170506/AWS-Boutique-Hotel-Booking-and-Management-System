@@ -3,12 +3,36 @@ const { UserStore, publicUser } = require("../models/UserStore");
 const store = new UserStore();
 
 function validateRegistration(payload) {
+  if (!payload || typeof payload !== "object") return "Request body must be valid JSON.";
   const required = ["fullName", "email", "phone", "password", "confirmPassword"];
-  const missing = required.filter((field) => !payload[field]);
+  const missing = required.filter((field) => !String(payload[field] || "").trim());
   if (missing.length) return `Missing required fields: ${missing.join(", ")}`;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return "Please provide a valid email address.";
   if (payload.password.length < 6) return "Password must be at least 6 characters.";
   if (payload.password !== payload.confirmPassword) return "Password and Confirm Password must match.";
+  return null;
+}
+
+function authError(error) {
+  if (error.name === "ConditionalCheckFailedException") {
+    return { status: 409, message: "Email is already registered." };
+  }
+
+  if (error.name === "ResourceNotFoundException") {
+    return { status: 503, message: "Users table is not available. Please verify DynamoDB table configuration." };
+  }
+
+  if (error.name === "ValidationException") {
+    return {
+      status: 500,
+      message: `Users table schema does not match the application configuration: ${error.message}`,
+    };
+  }
+
+  if (error.name === "CredentialsProviderError" || error.name === "UnrecognizedClientException") {
+    return { status: 503, message: "DynamoDB credentials are not available to the backend." };
+  }
+
   return null;
 }
 
@@ -23,6 +47,8 @@ async function register(req, res, next) {
     const user = await store.create(req.body);
     res.status(201).json({ user });
   } catch (error) {
+    const mapped = authError(error);
+    if (mapped) return res.status(mapped.status).json({ message: mapped.message });
     next(error);
   }
 }
@@ -39,6 +65,8 @@ async function login(req, res, next) {
 
     res.json({ user: publicUser(user) });
   } catch (error) {
+    const mapped = authError(error);
+    if (mapped) return res.status(mapped.status).json({ message: mapped.message });
     next(error);
   }
 }

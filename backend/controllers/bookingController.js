@@ -1,4 +1,5 @@
 const BookingStore = require("../models/BookingStore");
+const { publishBookingConfirmation } = require("../services/sns");
 
 const store = new BookingStore();
 
@@ -56,6 +57,13 @@ async function createBooking(req, res, next) {
     }
 
     const booking = await store.create(req.body);
+
+    try {
+      await publishBookingConfirmation(booking);
+    } catch (snsError) {
+      console.error("Failed to publish booking confirmation SNS message:", snsError);
+    }
+
     res.status(201).json(booking);
   } catch (error) {
     next(error);

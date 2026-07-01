@@ -1,7 +1,7 @@
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DescribeTableCommand, DynamoDBClient } = require("@aws-sdk/client-dynamodb");
 const { DynamoDBDocumentClient, ScanCommand } = require("@aws-sdk/lib-dynamodb");
 
-const REGION = process.env.AWS_REGION || "ap-south-1";
+const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
 
 const client = new DynamoDBClient({ region: REGION });
 
@@ -16,6 +16,17 @@ const tables = {
   bookings: process.env.DYNAMODB_BOOKINGS_TABLE || "Bookings",
   rooms: process.env.DYNAMODB_ROOMS_TABLE || "Rooms",
 };
+
+const keySchemaCache = new Map();
+
+async function getTableKeyNames(tableName) {
+  if (keySchemaCache.has(tableName)) return keySchemaCache.get(tableName);
+
+  const result = await client.send(new DescribeTableCommand({ TableName: tableName }));
+  const keyNames = (result.Table?.KeySchema || []).map((key) => key.AttributeName);
+  keySchemaCache.set(tableName, keyNames);
+  return keyNames;
+}
 
 async function scanAll(params) {
   const items = [];
@@ -35,4 +46,4 @@ async function scanAll(params) {
   return items;
 }
 
-module.exports = { docClient, scanAll, tables };
+module.exports = { docClient, getTableKeyNames, scanAll, tables };
