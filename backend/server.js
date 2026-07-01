@@ -30,7 +30,11 @@ function isAllowedOrigin(origin) {
 
   try {
     const { hostname } = new URL(origin);
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === PUBLIC_HOST;
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === PUBLIC_HOST
+    );
   } catch (_error) {
     return false;
   }
@@ -39,10 +43,13 @@ function isAllowedOrigin(origin) {
 app.use(
   cors({
     origin(origin, callback) {
+      console.log("Incoming Origin:", origin);
+
       if (isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }
+
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -74,7 +81,8 @@ app.use((req, res) => {
 
 app.use((err, _req, res, _next) => {
   console.error(err);
-  const status = err.status || (err.message === "Not allowed by CORS" ? 403 : 500);
+  const status =
+    err.status || (err.message === "Not allowed by CORS" ? 403 : 500);
   res.status(status).json({
     message: err.message || "Unexpected server error",
   });
