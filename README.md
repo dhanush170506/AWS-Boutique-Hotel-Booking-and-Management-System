@@ -62,7 +62,7 @@ Copy `backend/.env.example` to `backend/.env` if you want to customize ports or 
 ```env
 PORT=5000
 CLIENT_ORIGIN=http://localhost:5173
-AWS_REGION=ap-south-1
+AWS_REGION=us-east-1
 DYNAMODB_BOOKINGS_TABLE=HotelBookings
 S3_ASSETS_BUCKET=boutique-hotel-assets
 ```
