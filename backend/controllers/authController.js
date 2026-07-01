@@ -29,10 +29,6 @@ function authError(error) {
     };
   }
 
-  if (error.name === "CredentialsProviderError" || error.name === "UnrecognizedClientException") {
-    return { status: 503, message: "DynamoDB credentials are not available to the backend." };
-  }
-
   return null;
 }
 

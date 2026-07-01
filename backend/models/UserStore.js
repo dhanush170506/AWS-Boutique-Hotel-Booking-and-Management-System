@@ -1,6 +1,6 @@
 const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require("uuid");
-const { docClient, getTableKeyNames, scanAll, tables } = require("../services/dynamoDb");
+const { docClient, scanAll, tables } = require("../services/dynamoDb");
 
 const defaultPreferences = {
   bedPreference: "King Bed",
@@ -31,51 +31,17 @@ class UserStore {
   }
 
   async findById(userId) {
-    const keyNames = await getTableKeyNames(this.tableName);
-    const idKeyName = this.#findKeyName(keyNames, ["userId", "id", "UserID", "userID", "user_id"]);
-
-    if (idKeyName && keyNames.length === 1) {
-      const result = await docClient.send(
-        new GetCommand({
-          TableName: this.tableName,
-          Key: { [idKeyName]: userId },
-        }),
-      );
-      return this.#normalizeUser(result.Item);
-    }
-
-    const users = await scanAll({
-      TableName: this.tableName,
-      FilterExpression: "#userId = :userId OR #id = :userId OR #UserID = :userId OR #userID = :userId OR #user_id = :userId",
-      ExpressionAttributeNames: {
-        "#userId": "userId",
-        "#id": "id",
-        "#UserID": "UserID",
-        "#userID": "userID",
-        "#user_id": "user_id",
-      },
-      ExpressionAttributeValues: {
-        ":userId": userId,
-      },
-    });
-    return this.#normalizeUser(users[0]);
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { userId },
+      }),
+    );
+    return this.#normalizeUser(result.Item);
   }
 
   async findByEmail(email) {
     const normalizedEmail = email.trim().toLowerCase();
-    const keyNames = await getTableKeyNames(this.tableName);
-    const emailKeyName = this.#findKeyName(keyNames, ["email", "Email"]);
-
-    if (emailKeyName && keyNames.length === 1) {
-      const result = await docClient.send(
-        new GetCommand({
-          TableName: this.tableName,
-          Key: { [emailKeyName]: normalizedEmail },
-        }),
-      );
-      return this.#normalizeUser(result.Item);
-    }
-
     const users = await scanAll({
       TableName: this.tableName,
       FilterExpression: "#email = :email",
@@ -105,17 +71,11 @@ class UserStore {
       createdAt: new Date().toISOString()
     };
 
-    const keyNames = await getTableKeyNames(this.tableName);
-    this.#applyTableKeys(user, keyNames);
-
     await docClient.send(
       new PutCommand({
         TableName: this.tableName,
         Item: user,
-        ConditionExpression: `attribute_not_exists(#partitionKey)`,
-        ExpressionAttributeNames: {
-          "#partitionKey": keyNames[0],
-        },
+        ConditionExpression: "attribute_not_exists(userId)",
       }),
     );
     return publicUser(user);
@@ -138,9 +98,6 @@ class UserStore {
       updatedAt: new Date().toISOString()
     };
 
-    const keyNames = await getTableKeyNames(this.tableName);
-    this.#applyTableKeys(updated, keyNames);
-
     await docClient.send(
       new PutCommand({
         TableName: this.tableName,
@@ -148,27 +105,6 @@ class UserStore {
       }),
     );
     return publicUser(updated);
-  }
-
-  #applyTableKeys(user, keyNames) {
-    for (const keyName of keyNames) {
-      if (user[keyName] !== undefined && user[keyName] !== null && user[keyName] !== "") continue;
-
-      const normalizedKey = keyName.toLowerCase().replace(/[_-]/g, "");
-      if (normalizedKey === "email") {
-        user[keyName] = user.email;
-      } else if (normalizedKey === "id" || normalizedKey === "userid" || normalizedKey === "pk") {
-        user[keyName] = user.userId;
-      } else {
-        throw Object.assign(new Error(`Users table key "${keyName}" is not mapped by the application.`), {
-          status: 500,
-        });
-      }
-    }
-  }
-
-  #findKeyName(keyNames, candidates) {
-    return keyNames.find((keyName) => candidates.includes(keyName));
   }
 
   #normalizeUser(user) {
