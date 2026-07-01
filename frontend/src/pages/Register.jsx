@@ -46,8 +46,9 @@ export default function Register() {
 
     try {
       setLoading(true);
-      await register(form);
-      navigate("/", { replace: true });
+      const user = await register(form);
+      const redirect = user?.role === "Admin" ? "/admin" : "/";
+      navigate(redirect, { replace: true });
     } catch (err) {
       setApiError(err.response?.data?.message || "Unable to register.");
     } finally {

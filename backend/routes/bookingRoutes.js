@@ -5,16 +5,17 @@ const {
   getBookingsByUser,
   getBookingById,
   updateBooking,
-  deleteBooking
+  deleteBooking,
 } = require("../controllers/bookingController");
+const { loadUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.post("/", createBooking);
-router.get("/", getBookings);
-router.get("/user/:userId", getBookingsByUser);
-router.get("/:id", getBookingById);
-router.put("/:id", updateBooking);
-router.delete("/:id", deleteBooking);
+router.post("/", loadUser, createBooking);
+router.get("/", loadUser, requireRole("Admin"), getBookings);
+router.get("/user/:userId", loadUser, getBookingsByUser);
+router.get("/:id", loadUser, getBookingById);
+router.put("/:id", loadUser, updateBooking);
+router.delete("/:id", loadUser, deleteBooking);
 
 module.exports = router;

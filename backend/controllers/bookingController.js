@@ -1,7 +1,9 @@
 const BookingStore = require("../models/BookingStore");
+const RoomStore = require("../models/RoomStore");
 const { publishBookingConfirmation } = require("../services/sns");
 
 const store = new BookingStore();
+const roomStore = new RoomStore();
 
 const requiredFields = [
   "customerName",
@@ -11,7 +13,7 @@ const requiredFields = [
   "guests",
   "checkInDate",
   "checkOutDate",
-  "bedPreference"
+  "bedPreference",
 ];
 
 function validateBooking(payload) {
@@ -36,13 +38,15 @@ function validateBooking(payload) {
 }
 
 function validateBookingUpdate(payload) {
-  if (!payload.userId) return "User ID is required.";
-
   if (payload.guests !== undefined && Number(payload.guests) < 1) {
     return "Guests must be at least 1.";
   }
 
-  if (payload.checkInDate && payload.checkOutDate && new Date(payload.checkOutDate) <= new Date(payload.checkInDate)) {
+  if (
+    payload.checkInDate &&
+    payload.checkOutDate &&
+    new Date(payload.checkOutDate) <= new Date(payload.checkInDate)
+  ) {
     return "Check-out date must be after check-in date.";
   }
 
@@ -51,17 +55,46 @@ function validateBookingUpdate(payload) {
 
 async function createBooking(req, res, next) {
   try {
-    const validationError = validateBooking(req.body);
+    const payload = {
+      ...req.body,
+      userId: req.user?.userId || req.body.userId,
+    };
+    const validationError = validateBooking(payload);
     if (validationError) {
       return res.status(400).json({ message: validationError });
     }
 
-    const booking = await store.create(req.body);
+    let room = null;
+    if (payload.roomId) {
+      room = await roomStore.findById(payload.roomId);
+    }
+    if (!room && payload.roomType) {
+      room = await roomStore.findByName(payload.roomType);
+    }
+    if (!room) {
+      return res.status(404).json({ message: "Selected room not found." });
+    }
+    if (room.available === false) {
+      return res
+        .status(400)
+        .json({ message: "Selected room is not available." });
+    }
+
+    const booking = await store.create({
+      ...payload,
+      roomId: room.roomId,
+      roomType: room.name,
+      roomPrice: room.price,
+    });
+    await roomStore.updateAvailability(room.roomId, false);
 
     try {
       await publishBookingConfirmation(booking);
     } catch (snsError) {
-      console.error("Failed to publish booking confirmation SNS message:", snsError);
+      console.error(
+        "Failed to publish booking confirmation SNS message:",
+        snsError,
+      );
     }
 
     res.status(201).json(booking);
@@ -81,6 +114,11 @@ async function getBookings(_req, res, next) {
 
 async function getBookingsByUser(req, res, next) {
   try {
+    if (req.user.role !== "Admin" && req.user.userId !== req.params.userId) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: you can only view your own bookings." });
+    }
     const bookings = await store.findByUser(req.params.userId);
     res.json(bookings);
   } catch (error) {
@@ -93,6 +131,11 @@ async function getBookingById(req, res, next) {
     const booking = await store.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found." });
+    }
+    if (req.user.role !== "Admin" && booking.userId !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: you can only view your own bookings." });
     }
     res.json(booking);
   } catch (error) {
@@ -107,17 +150,29 @@ async function updateBooking(req, res, next) {
       return res.status(400).json({ message: validationError });
     }
 
-    const booking = await store.update(req.params.id, req.body);
+    const booking = await store.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found." });
     }
-    if (booking.forbidden) {
-      return res.status(403).json({ message: "You can only update your own bookings." });
+    if (req.user.role !== "Admin" && booking.userId !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "You can only update your own bookings." });
     }
-    if (booking.cancelled) {
-      return res.status(400).json({ message: "Cancelled bookings cannot be edited." });
+
+    const updated = await store.update(req.params.id, {
+      ...req.body,
+      userId: booking.userId,
+    });
+    if (!updated) {
+      return res.status(404).json({ message: "Booking not found." });
     }
-    res.json(booking);
+    if (updated.cancelled) {
+      return res
+        .status(400)
+        .json({ message: "Cancelled bookings cannot be edited." });
+    }
+    res.json(updated);
   } catch (error) {
     next(error);
   }
@@ -125,17 +180,21 @@ async function updateBooking(req, res, next) {
 
 async function deleteBooking(req, res, next) {
   try {
-    if (!req.body?.userId) {
-      return res.status(400).json({ message: "User ID is required." });
-    }
-
     const existing = await store.findById(req.params.id);
-    if (existing && existing.userId && existing.userId !== req.body.userId) {
-      return res.status(403).json({ message: "You can only cancel your own bookings." });
+    if (!existing) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+    if (req.user.role !== "Admin" && existing.userId !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "You can only cancel your own bookings." });
     }
     const booking = await store.cancel(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found." });
+    }
+    if (existing.roomId) {
+      await roomStore.updateAvailability(existing.roomId, true);
     }
     res.json(booking);
   } catch (error) {
@@ -149,5 +208,5 @@ module.exports = {
   getBookingsByUser,
   getBookingById,
   updateBooking,
-  deleteBooking
+  deleteBooking,
 };

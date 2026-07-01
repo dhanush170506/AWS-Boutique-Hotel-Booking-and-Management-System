@@ -42,7 +42,10 @@ class BookingStore {
       customerName: payload.customerName,
       email: payload.email,
       phone: payload.phone,
+      roomId: payload.roomId || null,
       roomType: payload.roomType,
+      roomPrice:
+        payload.roomPrice !== undefined ? Number(payload.roomPrice) : null,
       guests: Number(payload.guests),
       checkInDate: payload.checkInDate,
       checkOutDate: payload.checkOutDate,
@@ -50,7 +53,7 @@ class BookingStore {
       airportPickup: Boolean(payload.airportPickup),
       specialRequests: payload.specialRequests || "",
       bookingStatus: "Confirmed",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     await docClient.send(
@@ -66,20 +69,29 @@ class BookingStore {
   async update(bookingId, payload) {
     const existing = await this.findById(bookingId);
     if (!existing) return null;
-    if (existing.bookingStatus === "Cancelled") return { cancelled: true, booking: existing };
-    if (payload.userId && existing.userId && existing.userId !== payload.userId) return { forbidden: true };
+    if (existing.bookingStatus === "Cancelled")
+      return { cancelled: true, booking: existing };
+    if (payload.userId && existing.userId && existing.userId !== payload.userId)
+      return { forbidden: true };
 
     const updated = {
       ...existing,
       ...payload,
       bookingId,
       userId: existing.userId,
-      guests: payload.guests ? Number(payload.guests) : existing.guests,
+      roomId: payload.roomId || existing.roomId,
+      roomType: payload.roomType || existing.roomType,
+      roomPrice:
+        payload.roomPrice !== undefined
+          ? Number(payload.roomPrice)
+          : existing.roomPrice,
+      guests:
+        payload.guests !== undefined ? Number(payload.guests) : existing.guests,
       airportPickup:
         typeof payload.airportPickup === "boolean"
           ? payload.airportPickup
           : existing.airportPickup,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await docClient.send(
@@ -98,7 +110,7 @@ class BookingStore {
     const updated = {
       ...existing,
       bookingStatus: "Cancelled",
-      cancelledAt: new Date().toISOString()
+      cancelledAt: new Date().toISOString(),
     };
 
     await docClient.send(
@@ -111,7 +123,9 @@ class BookingStore {
   }
 
   #sortNewest(bookings) {
-    return bookings.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return bookings.sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+    );
   }
 }
 

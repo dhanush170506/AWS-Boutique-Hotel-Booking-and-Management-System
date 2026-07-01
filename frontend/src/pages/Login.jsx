@@ -31,8 +31,9 @@ export default function Login() {
 
     try {
       setLoading(true);
-      await login(form);
-      navigate(destination, { replace: true });
+      const user = await login(form);
+      const redirect = user?.role === "Admin" ? "/admin" : destination;
+      navigate(redirect, { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || "Unable to login.");
     } finally {

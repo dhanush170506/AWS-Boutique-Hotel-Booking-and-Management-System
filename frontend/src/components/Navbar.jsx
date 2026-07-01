@@ -12,13 +12,25 @@ const guestLinks = [
 
 const userLinks = [
   ["Home", "/"],
-  ["Rooms", "/rooms"]
+  ["Rooms", "/rooms"],
+  ["Dashboard", "/dashboard"],
+  ["My Bookings", "/my-bookings"]
+];
+
+const adminLinks = [
+  ["Home", "/"],
+  ["Rooms", "/rooms"],
+  ["Admin", "/admin"]
 ];
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
-  const { isAuthenticated, logout } = useAuth();
-  const links = isAuthenticated ? userLinks : guestLinks;
+  const { isAuthenticated, user, logout } = useAuth();
+  const links = isAuthenticated
+    ? user?.role === "Admin"
+      ? adminLinks
+      : userLinks
+    : guestLinks;
 
   function handleLogout() {
     logout();

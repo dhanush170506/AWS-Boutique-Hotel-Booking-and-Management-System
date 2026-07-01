@@ -1,13 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search } from "lucide-react";
 import RoomCard from "../components/RoomCard";
 import SectionTitle from "../components/SectionTitle";
-import { rooms } from "../assets/rooms";
+import { roomApi } from "../services/api";
 
 export default function Rooms() {
+  const [rooms, setRooms] = useState([]);
   const [query, setQuery] = useState("");
   const [capacity, setCapacity] = useState("all");
   const [availability, setAvailability] = useState("all");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    roomApi.list().then(setRooms).catch(() => setError("Unable to load rooms."));
+  }, []);
 
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
@@ -20,7 +26,7 @@ export default function Rooms() {
         (availability === "available" ? room.available : !room.available);
       return matchesText && matchesCapacity && matchesAvailability;
     });
-  }, [query, capacity, availability]);
+  }, [rooms, query, capacity, availability]);
 
   return (
     <section className="page-shell py-16">
@@ -63,7 +69,12 @@ export default function Rooms() {
         ))}
       </div>
 
-      {!filteredRooms.length && (
+      {error && (
+        <div className="mt-8 border border-red-400/40 bg-red-500/10 p-10 text-center text-red-100">
+          {error}
+        </div>
+      )}
+      {!filteredRooms.length && !error && (
         <div className="mt-8 border border-white/10 p-10 text-center text-ivory/70">
           No rooms match the selected filters.
         </div>

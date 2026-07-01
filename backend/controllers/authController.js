@@ -69,14 +69,24 @@ async function register(req, res, next) {
       return res.status(409).json({ message: "Email is already registered." });
     }
 
-    console.log("Creating user in DynamoDB...");
+    const adminEmails = new Set(
+      (process.env.ADMIN_EMAILS || "")
+        .split(",")
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const role = adminEmails.has(req.body.email.trim().toLowerCase())
+      ? "Admin"
+      : "User";
 
-    const user = await store.create(req.body);
+    console.log("Creating user in DynamoDB with role:", role);
+
+    const user = await store.create({ ...req.body, role });
 
     console.log("User created successfully:");
     console.log(user);
 
-    res.status(201).json({ user });
+    res.status(201).json({ user: publicUser(user) });
   } catch (error) {
     console.error("========== REGISTER ERROR ==========");
     console.error(error);

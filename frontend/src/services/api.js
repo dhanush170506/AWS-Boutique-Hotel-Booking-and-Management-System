@@ -1,5 +1,7 @@
 import axios from "axios";
 
+const SESSION_KEY = "aurelia_user";
+
 function resolveApiBaseUrl() {
   const configuredUrl = import.meta.env.VITE_API_URL;
 
@@ -27,6 +29,22 @@ function resolveApiBaseUrl() {
 const api = axios.create({
   baseURL: resolveApiBaseUrl(),
   timeout: 10000,
+});
+
+api.interceptors.request.use((config) => {
+  try {
+    const saved = localStorage.getItem(SESSION_KEY);
+    const user = saved ? JSON.parse(saved) : null;
+    if (user?.id) {
+      config.headers = {
+        ...config.headers,
+        "x-user-id": user.id,
+      };
+    }
+  } catch {
+    // ignore invalid session data
+  }
+  return config;
 });
 
 function getMessageFromResponse(error) {
@@ -84,14 +102,18 @@ export const authApi = {
 };
 
 export const userApi = {
-  profile: (userId) =>
-    api
-      .get("/users/profile", { headers: { "x-user-id": userId } })
-      .then((res) => res.data),
+  profile: (userId) => api.get("/users/profile").then((res) => res.data),
   updateProfile: (userId, payload) =>
-    api
-      .put("/users/profile", payload, { headers: { "x-user-id": userId } })
-      .then((res) => res.data),
+    api.put("/users/profile", payload).then((res) => res.data),
+};
+
+export const roomApi = {
+  list: () => api.get("/rooms").then((res) => res.data),
+  get: (roomId) => api.get(`/rooms/${roomId}`).then((res) => res.data),
+  create: (payload) => api.post("/rooms", payload).then((res) => res.data),
+  update: (roomId, payload) =>
+    api.put(`/rooms/${roomId}`, payload).then((res) => res.data),
+  delete: (roomId) => api.delete(`/rooms/${roomId}`).then((res) => res.data),
 };
 
 export default api;

@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from "react-router-dom";
 import LoadingButton from "../components/LoadingButton";
 import SectionTitle from "../components/SectionTitle";
-import { rooms } from "../assets/rooms";
-import { bookingApi } from "../services/api";
+import { bookingApi, roomApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 const initialForm = {
@@ -24,12 +23,15 @@ export default function Booking() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const selectedRoom = params.get("room");
+  const [rooms, setRooms] = useState([]);
   const [form, setForm] = useState({
     ...initialForm,
     customerName: user?.fullName || "",
     email: user?.email || "",
     phone: user?.phone || "",
-    roomType: selectedRoom || "Deluxe Room",
+    roomId: "",
+    roomType: selectedRoom || "",
+    roomPrice: 0,
     bedPreference: user?.preferences?.bedPreference || "King Bed",
     airportPickup: Boolean(user?.preferences?.airportPickup)
   });
@@ -37,7 +39,34 @@ export default function Booking() {
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const roomOptions = useMemo(() => rooms.filter((room) => room.available), []);
+  useEffect(() => {
+    roomApi.list().then((result) => {
+      setRooms(result);
+      if (!selectedRoom && result.length) {
+        const firstRoom = result.find((room) => room.available) || result[0];
+        if (!form.roomType || form.roomType === "") {
+          setForm((current) => ({
+            ...current,
+            roomId: firstRoom?.roomId || "",
+            roomType: firstRoom?.name || "",
+            roomPrice: firstRoom?.price || 0,
+          }));
+        }
+      }
+      if (selectedRoom) {
+        const match = result.find((room) => room.name === selectedRoom);
+        if (match) {
+          setForm((current) => ({
+            ...current,
+            roomId: match.roomId,
+            roomPrice: match.price,
+          }));
+        }
+      }
+    }).catch(() => setApiError("Unable to load available rooms."));
+  }, [selectedRoom]);
+
+  const roomOptions = useMemo(() => rooms.filter((room) => room.available), [rooms]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -105,9 +134,16 @@ export default function Booking() {
             <input className="field" type="date" value={form.checkOutDate} onChange={(e) => updateField("checkOutDate", e.target.value)} />
           </Field>
           <Field label="Room Type">
-            <select className="field" value={form.roomType} onChange={(e) => updateField("roomType", e.target.value)}>
+            <select className="field" value={form.roomType} onChange={(e) => {
+              const selected = rooms.find((room) => room.name === e.target.value);
+              updateField("roomType", e.target.value);
+              if (selected) {
+                updateField("roomId", selected.roomId);
+                updateField("roomPrice", selected.price);
+              }
+            }}>
               {roomOptions.map((room) => (
-                <option key={room.name} value={room.name}>{room.name}</option>
+                <option key={room.roomId} value={room.name}>{room.name}</option>
               ))}
             </select>
           </Field>
@@ -136,6 +172,9 @@ export default function Booking() {
               placeholder="Dietary preferences, celebration setup, arrival time..."
             />
           </Field>
+          {apiError === "Unable to load available rooms." && (
+            <div className="md:col-span-2 text-sm text-red-200">Only existing room IDs are available for booking.</div>
+          )}
         </div>
         <LoadingButton loading={loading} type="submit" className="mt-7 w-full md:w-auto">
           Confirm Booking

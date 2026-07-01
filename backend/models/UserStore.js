@@ -6,13 +6,21 @@ const defaultPreferences = {
   bedPreference: "King Bed",
   smokingPreference: "Non-Smoking",
   airportPickup: false,
-  foodPreference: "Vegetarian"
+  foodPreference: "Vegetarian",
 };
+
+const defaultRole = "User";
+const allowedRoles = new Set(["User", "Admin"]);
 
 function publicUser(user) {
   if (!user) return null;
   const { password, ...safeUser } = user;
-  const normalizedId = safeUser.userId || safeUser.id || safeUser.UserID || safeUser.userID || safeUser.user_id;
+  const normalizedId =
+    safeUser.userId ||
+    safeUser.id ||
+    safeUser.UserID ||
+    safeUser.userID ||
+    safeUser.user_id;
   if (!safeUser.id && normalizedId) safeUser.id = normalizedId;
   if (!safeUser.userId && normalizedId) safeUser.userId = normalizedId;
   return safeUser;
@@ -57,6 +65,7 @@ class UserStore {
 
   async create(payload) {
     const userId = `USR-${uuidv4().slice(0, 8).toUpperCase()}`;
+    const role = allowedRoles.has(payload.role) ? payload.role : defaultRole;
     const user = {
       userId,
       id: userId,
@@ -64,11 +73,12 @@ class UserStore {
       email: payload.email.trim().toLowerCase(),
       phone: payload.phone.trim(),
       password: payload.password,
+      role,
       preferences: {
         ...defaultPreferences,
-        ...(payload.preferences || {})
+        ...(payload.preferences || {}),
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     await docClient.send(
@@ -91,11 +101,12 @@ class UserStore {
       id: existing.id || userId,
       fullName: payload.fullName?.trim() || existing.fullName,
       phone: payload.phone?.trim() || existing.phone,
+      role: existing.role || defaultRole,
       preferences: {
         ...existing.preferences,
-        ...(payload.preferences || {})
+        ...(payload.preferences || {}),
       },
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await docClient.send(
@@ -109,7 +120,8 @@ class UserStore {
 
   #normalizeUser(user) {
     if (!user) return null;
-    const normalizedId = user.userId || user.id || user.UserID || user.userID || user.user_id;
+    const normalizedId =
+      user.userId || user.id || user.UserID || user.userID || user.user_id;
     return {
       ...user,
       id: user.id || normalizedId,

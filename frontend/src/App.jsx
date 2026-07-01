@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import MyBookings from "./pages/MyBookings";
 import Profile from "./pages/Profile";
 import Register from "./pages/Register";
+import Admin from "./pages/Admin";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/manage" element={<ProtectedRoute><ManageBooking /></ProtectedRoute>} />
           <Route path="/my-bookings" element={<ProtectedRoute><MyBookings /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={["Admin"]}><Admin /></ProtectedRoute>} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
