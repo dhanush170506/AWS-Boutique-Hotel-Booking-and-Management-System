@@ -9,7 +9,8 @@ const initialForm = {
   email: "",
   phone: "",
   password: "",
-  confirmPassword: ""
+  confirmPassword: "",
+  role: "user",
 };
 
 export default function Register() {
@@ -47,7 +48,8 @@ export default function Register() {
     try {
       setLoading(true);
       const user = await register(form);
-      const redirect = user?.role === "Admin" ? "/admin" : "/";
+      const normalizedRole = String(user?.role || "").trim().toLowerCase();
+      const redirect = normalizedRole === "admin" ? "/admin/dashboard" : "/dashboard";
       navigate(redirect, { replace: true });
     } catch (err) {
       setApiError(err.response?.data?.message || "Unable to register.");
@@ -62,6 +64,42 @@ export default function Register() {
       <form onSubmit={handleSubmit} className="mx-auto max-w-3xl bg-charcoal p-6 luxury-border md:p-8">
         {apiError && <div className="mb-5 border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-100">{apiError}</div>}
         <div className="grid gap-5 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <span className="label">Register as</span>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {[
+                { value: 'user', label: 'User', description: 'Reserve rooms and manage your stay.' },
+                { value: 'admin', label: 'Admin', description: 'Manage rooms, users, bookings and analytics.' },
+              ].map((option) => (
+                <label
+                  key={option.value}
+                  className={`cursor-pointer rounded-3xl border p-5 transition ${
+                    form.role === option.value
+                      ? 'border-champagne bg-champagne/10'
+                      : 'border-white/10 bg-midnight'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value={option.value}
+                    checked={form.role === option.value}
+                    onChange={() => updateField('role', option.value)}
+                    className="hidden"
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-ivory">{option.label}</p>
+                      <p className="mt-2 text-sm text-ivory/60">{option.description}</p>
+                    </div>
+                    <span className="rounded-full border border-white/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-ivory/70">
+                      {form.role === option.value ? 'Selected' : 'Select'}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
           <Field label="Full Name" error={errors.fullName}>
             <input className="field" value={form.fullName} onChange={(e) => updateField("fullName", e.target.value)} />
           </Field>

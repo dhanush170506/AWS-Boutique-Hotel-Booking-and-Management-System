@@ -114,7 +114,10 @@ async function getBookings(_req, res, next) {
 
 async function getBookingsByUser(req, res, next) {
   try {
-    if (req.user.role !== "Admin" && req.user.userId !== req.params.userId) {
+    const viewerRole = String(req.user.role || "")
+      .trim()
+      .toLowerCase();
+    if (viewerRole !== "admin" && req.user.userId !== req.params.userId) {
       return res
         .status(403)
         .json({ message: "Forbidden: you can only view your own bookings." });
@@ -132,7 +135,10 @@ async function getBookingById(req, res, next) {
     if (!booking) {
       return res.status(404).json({ message: "Booking not found." });
     }
-    if (req.user.role !== "Admin" && booking.userId !== req.user.userId) {
+    const viewerRole = String(req.user.role || "")
+      .trim()
+      .toLowerCase();
+    if (viewerRole !== "admin" && booking.userId !== req.user.userId) {
       return res
         .status(403)
         .json({ message: "Forbidden: you can only view your own bookings." });
@@ -184,12 +190,24 @@ async function deleteBooking(req, res, next) {
     if (!existing) {
       return res.status(404).json({ message: "Booking not found." });
     }
-    if (req.user.role !== "Admin" && existing.userId !== req.user.userId) {
+    const viewerRole = String(req.user.role || "")
+      .trim()
+      .toLowerCase();
+    if (viewerRole !== "admin" && existing.userId !== req.user.userId) {
       return res
         .status(403)
         .json({ message: "You can only cancel your own bookings." });
     }
-    const booking = await store.cancel(req.params.id);
+
+    const hardDelete = req.query.hard === "true" && viewerRole === "admin";
+    let booking;
+
+    if (hardDelete) {
+      booking = await store.delete(req.params.id);
+    } else {
+      booking = await store.cancel(req.params.id);
+    }
+
     if (!booking) {
       return res.status(404).json({ message: "Booking not found." });
     }

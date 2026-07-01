@@ -1,4 +1,8 @@
-const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+const {
+  GetCommand,
+  PutCommand,
+  DeleteCommand,
+} = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require("uuid");
 const { docClient, scanAll, tables } = require("../services/dynamoDb");
 
@@ -91,6 +95,9 @@ class BookingStore {
         typeof payload.airportPickup === "boolean"
           ? payload.airportPickup
           : existing.airportPickup,
+      paymentStatus:
+        payload.paymentStatus || existing.paymentStatus || "Pending",
+      bookingStatus: payload.bookingStatus || existing.bookingStatus,
       updatedAt: new Date().toISOString(),
     };
 
@@ -110,6 +117,7 @@ class BookingStore {
     const updated = {
       ...existing,
       bookingStatus: "Cancelled",
+      paymentStatus: existing.paymentStatus || "Refunded",
       cancelledAt: new Date().toISOString(),
     };
 
@@ -120,6 +128,31 @@ class BookingStore {
       }),
     );
     return updated;
+  }
+
+  async delete(bookingId) {
+    const existing = await this.findById(bookingId);
+    if (!existing) return null;
+
+    await docClient.send(
+      new DeleteCommand({
+        TableName: this.tableName,
+        Key: { bookingId },
+      }),
+    );
+
+    return existing;
+  }
+
+  async findByRoom(roomId) {
+    const bookings = await scanAll({
+      TableName: this.tableName,
+      FilterExpression: "roomId = :roomId",
+      ExpressionAttributeValues: {
+        ":roomId": roomId,
+      },
+    });
+    return this.#sortNewest(bookings);
   }
 
   #sortNewest(bookings) {

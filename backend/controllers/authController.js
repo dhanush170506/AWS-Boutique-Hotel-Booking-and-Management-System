@@ -69,15 +69,10 @@ async function register(req, res, next) {
       return res.status(409).json({ message: "Email is already registered." });
     }
 
-    const adminEmails = new Set(
-      (process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean),
-    );
-    const role = adminEmails.has(req.body.email.trim().toLowerCase())
-      ? "Admin"
-      : "User";
+    const requestedRole = String(req.body.role || "user")
+      .trim()
+      .toLowerCase();
+    const role = requestedRole === "admin" ? "admin" : "user";
 
     console.log("Creating user in DynamoDB with role:", role);
 

@@ -13,7 +13,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const destination = location.state?.from?.pathname
     ? `${location.state.from.pathname}${location.state.from.search || ""}`
-    : "/";
+    : "/dashboard";
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -32,7 +32,8 @@ export default function Login() {
     try {
       setLoading(true);
       const user = await login(form);
-      const redirect = user?.role === "Admin" ? "/admin" : destination;
+      const normalizedRole = String(user?.role || "").trim().toLowerCase();
+      const redirect = normalizedRole === "admin" ? "/admin/dashboard" : destination;
       navigate(redirect, { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || "Unable to login.");

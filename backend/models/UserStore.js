@@ -1,4 +1,8 @@
-const { GetCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+const {
+  GetCommand,
+  PutCommand,
+  DeleteCommand,
+} = require("@aws-sdk/lib-dynamodb");
 const { v4: uuidv4 } = require("uuid");
 const { docClient, scanAll, tables } = require("../services/dynamoDb");
 
@@ -9,8 +13,8 @@ const defaultPreferences = {
   foodPreference: "Vegetarian",
 };
 
-const defaultRole = "User";
-const allowedRoles = new Set(["User", "Admin"]);
+const defaultRole = "user";
+const allowedRoles = new Set(["user", "admin"]);
 
 function publicUser(user) {
   if (!user) return null;
@@ -65,7 +69,13 @@ class UserStore {
 
   async create(payload) {
     const userId = `USR-${uuidv4().slice(0, 8).toUpperCase()}`;
-    const role = allowedRoles.has(payload.role) ? payload.role : defaultRole;
+    const role = allowedRoles.has(
+      String(payload.role || "")
+        .trim()
+        .toLowerCase(),
+    )
+      ? String(payload.role).trim().toLowerCase()
+      : defaultRole;
     const user = {
       userId,
       id: userId,
@@ -95,13 +105,20 @@ class UserStore {
     const existing = await this.findById(userId);
     if (!existing) return null;
 
+    const requestedRole = String(payload.role || "")
+      .trim()
+      .toLowerCase();
+    const updatedRole = allowedRoles.has(requestedRole)
+      ? requestedRole
+      : existing.role || defaultRole;
+
     const updated = {
       ...existing,
       userId,
       id: existing.id || userId,
       fullName: payload.fullName?.trim() || existing.fullName,
       phone: payload.phone?.trim() || existing.phone,
-      role: existing.role || defaultRole,
+      role: updatedRole,
       preferences: {
         ...existing.preferences,
         ...(payload.preferences || {}),
@@ -116,6 +133,19 @@ class UserStore {
       }),
     );
     return publicUser(updated);
+  }
+
+  async delete(userId) {
+    const existing = await this.findById(userId);
+    if (!existing) return null;
+
+    await docClient.send(
+      new DeleteCommand({
+        TableName: this.tableName,
+        Key: { userId },
+      }),
+    );
+    return existing;
   }
 
   #normalizeUser(user) {

@@ -1,6 +1,8 @@
 const RoomStore = require("../models/RoomStore");
+const BookingStore = require("../models/BookingStore");
 
 const store = new RoomStore();
+const bookingStore = new BookingStore();
 
 async function getRooms(_req, res, next) {
   try {
@@ -44,6 +46,15 @@ async function updateRoom(req, res, next) {
   }
 }
 
+async function getRoomBookings(req, res, next) {
+  try {
+    const bookings = await bookingStore.findByRoom(req.params.id);
+    res.json(bookings);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function deleteRoom(req, res, next) {
   try {
     const room = await store.delete(req.params.id);
@@ -56,4 +67,11 @@ async function deleteRoom(req, res, next) {
   }
 }
 
-module.exports = { getRooms, getRoomById, createRoom, updateRoom, deleteRoom };
+module.exports = {
+  getRooms,
+  getRoomById,
+  getRoomBookings,
+  createRoom,
+  updateRoom,
+  deleteRoom,
+};

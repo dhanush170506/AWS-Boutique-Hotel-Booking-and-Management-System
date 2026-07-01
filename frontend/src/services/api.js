@@ -116,4 +116,35 @@ export const roomApi = {
   delete: (roomId) => api.delete(`/rooms/${roomId}`).then((res) => res.data),
 };
 
+export const adminApi = {
+  analytics: () => api.get("/admin/analytics").then((res) => res.data),
+  listUsers: () => api.get("/admin/users").then((res) => res.data),
+  getUser: (userId) =>
+    api.get(`/admin/users/${userId}`).then((res) => res.data),
+  updateUser: (userId, payload) =>
+    api.put(`/admin/users/${userId}`, payload).then((res) => res.data),
+  deleteUser: (userId) =>
+    api.delete(`/admin/users/${userId}`).then((res) => res.data),
+  listBookings: () => api.get("/admin/bookings").then((res) => res.data),
+  getBooking: (bookingId) =>
+    api.get(`/admin/bookings/${bookingId}`).then((res) => res.data),
+  updateBooking: (bookingId, payload) =>
+    api.put(`/admin/bookings/${bookingId}`, payload).then((res) => res.data),
+  cancelBooking: (bookingId) =>
+    api.delete(`/admin/bookings/${bookingId}`).then((res) => res.data),
+  deleteBooking: (bookingId) =>
+    api
+      .delete(`/admin/bookings/${bookingId}?hard=true`)
+      .then((res) => res.data),
+  listRooms: () => api.get("/admin/rooms").then((res) => res.data),
+  getRoom: (roomId) =>
+    api.get(`/admin/rooms/${roomId}`).then((res) => res.data),
+  createRoom: (payload) =>
+    api.post("/admin/rooms", payload).then((res) => res.data),
+  updateRoom: (roomId, payload) =>
+    api.put(`/admin/rooms/${roomId}`, payload).then((res) => res.data),
+  deleteRoom: (roomId) =>
+    api.delete(`/admin/rooms/${roomId}`).then((res) => res.data),
+};
+
 export default api;

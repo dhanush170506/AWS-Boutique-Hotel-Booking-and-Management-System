@@ -12,7 +12,7 @@ const { loadUser, requireRole } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.post("/", loadUser, createBooking);
-router.get("/", loadUser, requireRole("Admin"), getBookings);
+router.get("/", loadUser, requireRole("admin"), getBookings);
 router.get("/user/:userId", loadUser, getBookingsByUser);
 router.get("/:id", loadUser, getBookingById);
 router.put("/:id", loadUser, updateBooking);
