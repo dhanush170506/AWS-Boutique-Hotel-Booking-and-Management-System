@@ -3,6 +3,7 @@ const { PutObjectCommand, S3Client } = require("@aws-sdk/client-s3");
 const REGION =
   process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
 const bucketName = process.env.S3_BUCKET_NAME || "boutique-hotel-images";
+
 const client = new S3Client({ region: REGION });
 
 async function uploadImageToS3({ fileName, contentType, base64 }) {
@@ -19,7 +20,6 @@ async function uploadImageToS3({ fileName, contentType, base64 }) {
       Key: key,
       Body: buffer,
       ContentType: contentType,
-      ACL: "public-read",
     }),
   );
 
