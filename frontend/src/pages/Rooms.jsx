@@ -3,6 +3,7 @@ import { Search, X } from "lucide-react";
 import RoomCard from "../components/RoomCard";
 import SectionTitle from "../components/SectionTitle";
 import { roomApi } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 function getAvailabilityLabel(room) {
   const totalRooms = Number(room?.totalRooms || 1);
@@ -22,6 +23,9 @@ export default function Rooms() {
   useEffect(() => {
     roomApi.list().then(setRooms).catch(() => setError("Unable to load rooms."));
   }, []);
+
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = isAuthenticated && user?.role === "Admin";
 
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
@@ -63,7 +67,7 @@ export default function Rooms() {
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {filteredRooms.map((room) => (
-          <RoomCard key={room.roomId} room={room} onSelect={setSelectedRoom} />
+          <RoomCard key={room.roomId} room={room} onSelect={setSelectedRoom} isAdmin={isAdmin} />
         ))}
       </div>
 
@@ -111,9 +115,11 @@ export default function Rooms() {
                   <h3 className="text-lg font-semibold text-champagne">Cancellation Policy</h3>
                   <p className="mt-2 text-sm leading-7 text-ivory/75">Free cancellation up to 48 hours before arrival. A fee may apply for late cancellations.</p>
                 </div>
-                <button type="button" className={`w-full ${Number(selectedRoom.availableRooms || 0) > 0 ? "btn-primary" : "btn-secondary opacity-60"}`} disabled={Number(selectedRoom.availableRooms || 0) <= 0} onClick={() => window.location.assign(`/booking?room=${encodeURIComponent(selectedRoom.roomName || selectedRoom.name)}`)}>
-                  {Number(selectedRoom.availableRooms || 0) > 0 ? "Reserve This Room" : "Booked Out"}
-                </button>
+                {!isAdmin && (
+                  <button type="button" className={`w-full ${Number(selectedRoom.availableRooms || 0) > 0 ? "btn-primary" : "btn-secondary opacity-60"}`} disabled={Number(selectedRoom.availableRooms || 0) <= 0} onClick={() => window.location.assign(`/booking?room=${encodeURIComponent(selectedRoom.roomName || selectedRoom.name)}`)}>
+                    {Number(selectedRoom.availableRooms || 0) > 0 ? "Reserve This Room" : "Booked Out"}
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -8,9 +8,9 @@ function getAvailabilityLabel(room) {
   return `${availableRooms}/${totalRooms}`;
 }
 
-export default function RoomCard({ room, onSelect }) {
-  const imageUrl = room.imageUrls?.[0] || room.image || room.images?.[0] || "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
-  const available = Number(room.availableRooms || 0) > 0;
+export default function RoomCard({ room, onSelect, isAdmin }) {
+   const imageUrl = room.imageUrls?.[0] || room.image || room.images?.[0] || "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
+   const available = Number(room.availableRooms || 0) > 0;
 
   return (
     <article className="group overflow-hidden bg-charcoal luxury-border transition duration-300 hover:-translate-y-1 hover:shadow-gold">
@@ -51,9 +51,11 @@ export default function RoomCard({ room, onSelect }) {
           <button type="button" className="btn-secondary flex-1" onClick={() => onSelect(room)}>
             <Sparkles size={16} className="mr-2 inline" /> View Details
           </button>
-          <button type="button" className={`flex-1 ${available ? "btn-primary" : "btn-secondary opacity-60"}`} disabled={!available} onClick={() => window.location.assign(`/booking?room=${encodeURIComponent(room.roomName || room.name)}`)}>
-            Book Now
-          </button>
+          {!isAdmin && (
+            <button type="button" className={`flex-1 ${available ? "btn-primary" : "btn-secondary opacity-60"}`} disabled={!available} onClick={() => window.location.assign(`/booking?room=${encodeURIComponent(room.roomName || room.name)}`)}>
+              Book Now
+            </button>
+          )}
         </div>
       </div>
     </article>

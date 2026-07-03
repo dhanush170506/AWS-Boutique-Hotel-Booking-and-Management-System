@@ -20,7 +20,7 @@ const userLinks = [
 const adminLinks = [
   ["Home", "/"],
   ["Rooms", "/rooms"],
-  ["Admin", "/admin"]
+  ["Dashboard", "/admin/dashboard"],
 ];
 
 export default function Navbar() {

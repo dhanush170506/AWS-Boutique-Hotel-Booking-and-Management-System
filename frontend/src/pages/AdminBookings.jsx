@@ -52,39 +52,51 @@ export default function AdminBookings() {
 
       {error && <div className="mt-6 rounded-3xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{error}</div>}
 
-      <div className="mt-6 overflow-x-auto">
+      <div className="relative mt-6 overflow-x-auto">
         <table className="min-w-full border-collapse text-left text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-charcoal">
             <tr className="border-b border-white/10 text-ivory/70">
-              <th className="py-4 pr-6">Booking ID</th>
-              <th className="py-4 pr-6">Customer</th>
-              <th className="py-4 pr-6">Email</th>
-              <th className="py-4 pr-6">Room</th>
-              <th className="py-4 pr-6">Check-In</th>
-              <th className="py-4 pr-6">Check-Out</th>
-              <th className="py-4 pr-6">Status</th>
-              <th className="py-4 pr-6">Payment</th>
-              <th className="py-4 pr-6">Actions</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Booking ID</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Customer</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Email</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Room</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Room Price/Night</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Total Nights</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Total Price</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Check-In</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Check-Out</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Status</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Payment</th>
+              <th className="py-4 pr-4 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((booking) => (
-              <tr key={booking.bookingId} className="border-b border-white/10">
-                <td className="py-4 pr-6">{booking.bookingId}</td>
-                <td className="py-4 pr-6">{booking.customerName}</td>
-                <td className="py-4 pr-6">{booking.email}</td>
-                <td className="py-4 pr-6">{booking.roomType}</td>
-                <td className="py-4 pr-6">{new Date(booking.checkInDate).toLocaleDateString()}</td>
-                <td className="py-4 pr-6">{new Date(booking.checkOutDate).toLocaleDateString()}</td>
-                <td className="py-4 pr-6 uppercase tracking-[0.14em] text-champagne">{booking.bookingStatus}</td>
-                <td className="py-4 pr-6 uppercase tracking-[0.14em] text-ivory/70">{booking.paymentStatus || 'Pending'}</td>
-                <td className="py-4 pr-6 space-x-2">
-                  <button className="btn-secondary">View</button>
-                  <button className="btn-secondary" onClick={() => cancelBooking(booking.bookingId)}>Cancel</button>
-                  <button className="btn-secondary border-red-400/25 text-red-100 hover:bg-red-500" onClick={() => deleteBooking(booking.bookingId)}>Delete</button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((booking) => {
+              const checkIn = new Date(booking.checkInDate);
+              const checkOut = new Date(booking.checkOutDate);
+              const totalNights = checkIn && checkOut ? Math.max(0, Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24)) : 0;
+              const roomPrice = Number(booking.roomPrice || 0);
+              const totalPrice = roomPrice * totalNights;
+              return (
+                <tr key={booking.bookingId} className="border-b border-white/10">
+                  <td className="py-4 pr-4 whitespace-nowrap">{booking.bookingId}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">{booking.customerName}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">{booking.email}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">{booking.roomType}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">₹{roomPrice.toLocaleString('en-IN')}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">{totalNights}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">₹{totalPrice.toLocaleString('en-IN')}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">{checkIn.toLocaleDateString()}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap">{checkOut.toLocaleDateString()}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap uppercase tracking-[0.14em] text-champagne">{booking.bookingStatus}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap uppercase tracking-[0.14em] text-ivory/70">{booking.paymentStatus || 'Pending'}</td>
+                  <td className="py-4 pr-4 whitespace-nowrap space-x-2">
+                    <button className="btn-secondary" onClick={() => cancelBooking(booking.bookingId)}>Cancel</button>
+                    <button className="btn-secondary border-red-400/25 text-red-100 hover:bg-red-500" onClick={() => deleteBooking(booking.bookingId)}>Delete</button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
