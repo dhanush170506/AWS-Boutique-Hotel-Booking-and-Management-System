@@ -4,27 +4,55 @@ import SectionTitle from '../components/SectionTitle';
 import LoadingButton from '../components/LoadingButton';
 import { adminApi } from '../services/api';
 
+const facilityOptions = [
+  'WiFi',
+  'Air Conditioner',
+  'TV',
+  'Bathroom',
+  'Balcony',
+  'Parking',
+  'Room Service',
+  'Breakfast Included',
+  'Hot Water',
+  'Mini Bar',
+];
+
 const emptyRoom = {
-  roomNumber: '',
   roomName: '',
   roomType: '',
   description: '',
   price: '',
   totalRooms: '',
-  availableRooms: '',
-  bedrooms: '',
-  beds: '',
-  maxGuests: '',
-  status: 'Available',
-  facilities: '',
-  imageUrls: '',
+  facilities: [],
+  imageUrl: '',
+  imagePreview: '',
 };
+
+function getRoomImageUrl(room) {
+  return room?.imageUrl || room?.imageUrls?.[0] || room?.images?.[0] || '';
+}
+
+function getAvailabilityLabel(room) {
+  const totalRooms = Number(room?.totalRooms || room?.capacity || 1);
+  const availableRooms = Number(room?.availableRooms ?? room?.available ?? totalRooms);
+  if (availableRooms <= 0) return 'Booked Out';
+  return `${availableRooms}/${totalRooms}`;
+}
+
+const roomFields = [
+  ['Room Name', 'roomName'],
+  ['Room Type', 'roomType'],
+  ['Price', 'price'],
+  ['Total Rooms', 'totalRooms'],
+  ['Description', 'description'],
+];
 
 export default function AdminRooms() {
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [form, setForm] = useState(emptyRoom);
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -34,19 +62,14 @@ export default function AdminRooms() {
   function editRoom(room) {
     setSelectedRoom(room);
     setForm({
-      roomNumber: room.roomNumber || '',
       roomName: room.roomName || room.name || '',
       roomType: room.roomType || '',
       description: room.description || '',
       price: String(room.price || ''),
       totalRooms: String(room.totalRooms || ''),
-      availableRooms: String(room.availableRooms || ''),
-      bedrooms: String(room.bedrooms || ''),
-      beds: String(room.beds || ''),
-      maxGuests: String(room.maxGuests || room.capacity || ''),
-      status: room.status || (Number(room.availableRooms || 0) > 0 ? 'Available' : 'Booked Out'),
-      facilities: (room.facilities || room.amenities || []).join(', '),
-      imageUrls: (room.imageUrls || room.images || []).join(', '),
+      facilities: room.facilities || room.amenities || [],
+      imageUrl: getRoomImageUrl(room),
+      imagePreview: getRoomImageUrl(room),
     });
     setError('');
   }
@@ -54,6 +77,45 @@ export default function AdminRooms() {
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     setError('');
+  }
+
+  function toggleFacility(facility) {
+    setForm((current) => {
+      const facilities = current.facilities.includes(facility)
+        ? current.facilities.filter((item) => item !== facility)
+        : [...current.facilities, facility];
+      return { ...current, facilities };
+    });
+    setError('');
+  }
+
+  async function handleImageSelection(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingImage(true);
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = () => reject(new Error('Unable to read the selected file.'));
+        reader.readAsDataURL(file);
+      });
+
+      const uploaded = await adminApi.uploadImage({
+        fileName: file.name,
+        contentType: file.type || 'application/octet-stream',
+        base64,
+      });
+
+      updateField('imageUrl', uploaded.imageUrl);
+      updateField('imagePreview', uploaded.imageUrl);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to upload the selected image.');
+    } finally {
+      setUploadingImage(false);
+      event.target.value = '';
+    }
   }
 
   async function saveRoom(event) {
@@ -64,22 +126,17 @@ export default function AdminRooms() {
     }
 
     const payload = {
-      roomNumber: form.roomNumber.trim(),
       roomName: form.roomName.trim(),
       name: form.roomName.trim(),
       roomType: form.roomType.trim(),
       description: form.description.trim(),
       price: Number(form.price),
       totalRooms: Number(form.totalRooms),
-      availableRooms: Number(form.availableRooms || form.totalRooms),
-      bedrooms: Number(form.bedrooms || 1),
-      beds: Number(form.beds || 1),
-      maxGuests: Number(form.maxGuests || 2),
-      status: form.status,
-      facilities: form.facilities.split(',').map((item) => item.trim()).filter(Boolean),
-      amenities: form.facilities.split(',').map((item) => item.trim()).filter(Boolean),
-      imageUrls: form.imageUrls.split(',').map((item) => item.trim()).filter(Boolean),
-      images: form.imageUrls.split(',').map((item) => item.trim()).filter(Boolean),
+      facilities: form.facilities,
+      amenities: form.facilities,
+      imageUrl: form.imageUrl || '',
+      imageUrls: form.imageUrl ? [form.imageUrl] : [],
+      images: form.imageUrl ? [form.imageUrl] : [],
     };
 
     try {
@@ -115,7 +172,7 @@ export default function AdminRooms() {
   return (
     <div className="rounded-3xl border border-white/10 bg-charcoal p-8">
       <SectionTitle eyebrow="Room management" title="Manage Hotel Rooms" description="Add, edit, and configure room inventory with modern hotel metadata." />
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_460px]">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_500px]">
         <div className="overflow-x-auto rounded-3xl border border-white/10 bg-midnight p-4">
           <table className="min-w-full border-collapse text-left text-sm">
             <thead>
@@ -123,7 +180,7 @@ export default function AdminRooms() {
                 <th className="py-4 pr-6">Room</th>
                 <th className="py-4 pr-6">Type</th>
                 <th className="py-4 pr-6">Price</th>
-                <th className="py-4 pr-6">Available</th>
+                <th className="py-4 pr-6">Availability</th>
                 <th className="py-4 pr-6">Total</th>
                 <th className="py-4 pr-6">Actions</th>
               </tr>
@@ -131,10 +188,10 @@ export default function AdminRooms() {
             <tbody>
               {roomRows.map((room) => (
                 <tr key={room.roomId} className="border-b border-white/10 text-ivory/80">
-                  <td className="py-4 pr-6">{room.roomNumber} / {room.roomName || room.name}</td>
+                  <td className="py-4 pr-6">{room.roomName || room.name}</td>
                   <td className="py-4 pr-6">{room.roomType}</td>
                   <td className="py-4 pr-6">₹{Number(room.price || 0).toLocaleString('en-IN')}</td>
-                  <td className="py-4 pr-6">{room.availableRooms}</td>
+                  <td className="py-4 pr-6">{getAvailabilityLabel(room)}</td>
                   <td className="py-4 pr-6">{room.totalRooms}</td>
                   <td className="py-4 pr-6 space-x-2">
                     <button className="btn-secondary" onClick={() => editRoom(room)}>Edit</button>
@@ -158,47 +215,53 @@ export default function AdminRooms() {
           </div>
 
           <div className="mt-6 grid gap-4">
-            {[
-              ['Room Number', 'roomNumber'],
-              ['Room Type', 'roomType'],
-              ['Room Name', 'roomName'],
-              ['Description', 'description'],
-              ['Price', 'price'],
-              ['Total Rooms', 'totalRooms'],
-              ['Available Rooms', 'availableRooms'],
-              ['Bedrooms', 'bedrooms'],
-              ['Beds', 'beds'],
-              ['Max Guests', 'maxGuests'],
-              ['Status', 'status'],
-            ].map(([label, key]) => (
+            {roomFields.map(([label, key]) => (
               <label key={key}>
                 <span className="label">{label}</span>
-                {key === 'status' ? (
-                  <select className="field" value={form[key]} onChange={(event) => updateField(key, event.target.value)}>
-                    <option value="Available">Available</option>
-                    <option value="Booked Out">Booked Out</option>
-                    <option value="Maintenance">Maintenance</option>
-                  </select>
-                ) : (
-                  <input className="field" type={['price', 'totalRooms', 'availableRooms', 'bedrooms', 'beds', 'maxGuests'].includes(key) ? 'number' : 'text'} value={form[key]} onChange={(event) => updateField(key, event.target.value)} />
-                )}
+                <input className="field" type={['price', 'totalRooms'].includes(key) ? 'number' : 'text'} value={form[key]} onChange={(event) => updateField(key, event.target.value)} />
               </label>
             ))}
 
-            <label>
-              <span className="label">Facilities (comma separated)</span>
-              <input className="field" value={form.facilities} onChange={(event) => updateField('facilities', event.target.value)} />
-            </label>
-            <label>
-              <span className="label">Image URLs (comma separated)</span>
-              <input className="field" value={form.imageUrls} onChange={(event) => updateField('imageUrls', event.target.value)} />
-            </label>
+            <div>
+              <span className="label mb-2 block">Facilities</span>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {facilityOptions.map((facility) => (
+                  <label key={facility} className="flex items-center gap-2 text-sm text-ivory/70">
+                    <input
+                      type="checkbox"
+                      checked={form.facilities.includes(facility)}
+                      onChange={() => toggleFacility(facility)}
+                      className="h-4 w-4 rounded border-white/20 accent-champagne"
+                    />
+                    <span>{facility}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <span className="label mb-2 block">Room Image</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelection}
+                disabled={uploadingImage}
+                className="hidden"
+                id="room-image-upload"
+              />
+              <label htmlFor="room-image-upload" className="btn-secondary cursor-pointer">
+                {uploadingImage ? 'Uploading...' : 'Upload Image'}
+              </label>
+              {form.imagePreview && (
+                <img src={form.imagePreview} alt="Preview" className="mt-3 h-32 w-full rounded-2xl object-cover" />
+              )}
+            </div>
           </div>
 
           {error && <div className="mt-5 rounded-3xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{error}</div>}
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <LoadingButton loading={loading} type="submit" className="btn-primary">
+            <LoadingButton loading={loading || uploadingImage} type="submit" className="btn-primary">
               {selectedRoom ? 'Save Room' : 'Add Room'}
             </LoadingButton>
             {selectedRoom && (

@@ -1,5 +1,12 @@
 import React from 'react';
-import { Users, BedDouble, Sparkles } from "lucide-react";
+import { Users, Sparkles } from "lucide-react";
+
+function getAvailabilityLabel(room) {
+  const totalRooms = Number(room?.totalRooms || 1);
+  const availableRooms = Number(room?.availableRooms || totalRooms);
+  if (availableRooms <= 0) return 'Booked Out';
+  return `${availableRooms}/${totalRooms}`;
+}
 
 export default function RoomCard({ room, onSelect }) {
   const imageUrl = room.imageUrls?.[0] || room.image || room.images?.[0] || "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80";
@@ -26,8 +33,7 @@ export default function RoomCard({ room, onSelect }) {
         </div>
         <p className="mt-4 text-sm leading-7 text-ivory/68">{room.description}</p>
         <div className="mt-4 flex flex-wrap gap-3 text-sm text-ivory/75">
-          <span className="flex items-center gap-2"><Users size={16} className="text-champagne" /> Up to {room.maxGuests || room.capacity || 2} guests</span>
-          <span className="flex items-center gap-2"><BedDouble size={16} className="text-champagne" /> {room.bedrooms || 1} bedroom</span>
+          <span className="flex items-center gap-2"><Users size={16} className="text-champagne" /> {getAvailabilityLabel(room)} available</span>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           {(room.facilities || room.amenities || []).slice(0, 4).map((item) => (
@@ -37,7 +43,7 @@ export default function RoomCard({ room, onSelect }) {
         <div className="mt-5 rounded-2xl border border-white/10 bg-midnight/70 p-4 text-sm text-ivory/75">
           <div className="flex items-center justify-between">
             <span>Availability</span>
-            <span className="font-semibold text-champagne">{room.availableRooms || 0} / {room.totalRooms || 1}</span>
+            <span className="font-semibold text-champagne">{getAvailabilityLabel(room)}</span>
           </div>
           <p className="mt-2 text-xs uppercase tracking-[0.16em] text-ivory/60">{room.status || (available ? "Available" : "Booked Out")}</p>
         </div>

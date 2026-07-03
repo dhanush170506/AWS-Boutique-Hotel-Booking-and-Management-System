@@ -29,18 +29,17 @@ async function createRoom(req, res, next) {
   try {
     const payload = { ...req.body };
     const totalRooms = Number(payload.totalRooms ?? 1);
-    const availableRooms = Number(payload.availableRooms ?? totalRooms);
     if (totalRooms < 1) {
       return res
         .status(400)
         .json({ message: "Total rooms must be at least 1." });
     }
-    if (availableRooms > totalRooms) {
-      return res
-        .status(400)
-        .json({ message: "Available rooms cannot exceed total rooms." });
-    }
-    const room = await store.create(payload);
+
+    const room = await store.create({
+      ...payload,
+      totalRooms,
+      availableRooms: totalRooms,
+    });
     res.status(201).json(room);
   } catch (error) {
     next(error);
@@ -61,11 +60,9 @@ async function updateRoom(req, res, next) {
         Number(existing.totalRooms || 0) - Number(existing.availableRooms || 0),
       );
       if (Number(payload.totalRooms) < occupiedRooms) {
-        return res
-          .status(400)
-          .json({
-            message: "Total rooms cannot be less than already booked rooms.",
-          });
+        return res.status(400).json({
+          message: "Total rooms cannot be less than already booked rooms.",
+        });
       }
     }
 

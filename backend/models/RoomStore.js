@@ -36,6 +36,9 @@ function normalizeRoom(room) {
   const availableRooms = Number(
     room.availableRooms ?? room.available ?? totalRooms,
   );
+  const imageUrls = normalizeStringList(
+    room.imageUrls ?? room.images ?? (room.imageUrl ? [room.imageUrl] : []),
+  );
   const normalized = {
     ...room,
     roomId: room.roomId || room.id,
@@ -51,7 +54,9 @@ function normalizeRoom(room) {
     totalRooms,
     availableRooms: Math.min(totalRooms, Math.max(0, availableRooms)),
     facilities: normalizeStringList(room.facilities ?? room.amenities),
-    imageUrls: normalizeStringList(room.imageUrls ?? room.images),
+    imageUrl: room.imageUrl || imageUrls[0] || "",
+    imageUrls,
+    images: imageUrls,
     status: room.status || getStatus({ ...room, totalRooms, availableRooms }),
     available: availableRooms > 0,
     createdAt: room.createdAt || new Date().toISOString(),
@@ -106,10 +111,11 @@ class RoomStore {
   async create(payload) {
     const roomId = `ROOM-${uuidv4().slice(0, 8).toUpperCase()}`;
     const totalRooms = Number(payload.totalRooms ?? payload.capacity ?? 1);
-    const availableRooms = Number(
-      payload.availableRooms !== undefined
-        ? payload.availableRooms
-        : totalRooms,
+    const availableRooms = totalRooms;
+    const imageUrls = normalizeStringList(
+      payload.imageUrls ??
+        payload.images ??
+        (payload.imageUrl ? [payload.imageUrl] : []),
     );
     const room = normalizeRoom({
       roomId,
@@ -122,7 +128,9 @@ class RoomStore {
       maxGuests: Number(payload.maxGuests ?? payload.capacity ?? 1),
       price: Number(payload.price || 0),
       facilities: payload.facilities ?? payload.amenities,
-      imageUrls: payload.imageUrls ?? payload.images,
+      imageUrl: payload.imageUrl || imageUrls[0] || "",
+      imageUrls,
+      images: imageUrls,
       totalRooms,
       availableRooms: Math.min(totalRooms, Math.max(0, availableRooms)),
       available: availableRooms > 0,
@@ -155,6 +163,14 @@ class RoomStore {
     );
     const recalculatedAvailableRooms = Math.max(0, totalRooms - occupiedRooms);
 
+    const imageUrls = normalizeStringList(
+      payload.imageUrls !== undefined
+        ? payload.imageUrls
+        : payload.imageUrl
+          ? [payload.imageUrl]
+          : existing.imageUrls,
+    );
+
     const updated = normalizeRoom({
       ...existing,
       ...payload,
@@ -182,19 +198,12 @@ class RoomStore {
         payload.facilities !== undefined
           ? normalizeStringList(payload.facilities)
           : existing.facilities,
-      imageUrls:
-        payload.imageUrls !== undefined
-          ? normalizeStringList(payload.imageUrls)
-          : existing.imageUrls,
+      imageUrl: payload.imageUrl || imageUrls[0] || existing.imageUrl || "",
+      imageUrls,
+      images: imageUrls,
       totalRooms,
-      availableRooms:
-        payload.availableRooms !== undefined
-          ? Math.min(totalRooms, Math.max(0, Number(payload.availableRooms)))
-          : recalculatedAvailableRooms,
-      available:
-        payload.available !== undefined
-          ? Boolean(payload.available)
-          : existing.available,
+      availableRooms: recalculatedAvailableRooms,
+      available: recalculatedAvailableRooms > 0,
       updatedAt: new Date().toISOString(),
     });
 

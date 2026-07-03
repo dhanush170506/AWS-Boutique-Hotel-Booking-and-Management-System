@@ -4,6 +4,13 @@ import RoomCard from "../components/RoomCard";
 import SectionTitle from "../components/SectionTitle";
 import { roomApi } from "../services/api";
 
+function getAvailabilityLabel(room) {
+  const totalRooms = Number(room?.totalRooms || 1);
+  const availableRooms = Number(room?.availableRooms ?? totalRooms);
+  if (availableRooms <= 0) return 'Booked Out';
+  return `${availableRooms}/${totalRooms}`;
+}
+
 export default function Rooms() {
   const [rooms, setRooms] = useState([]);
   const [query, setQuery] = useState("");
@@ -89,10 +96,7 @@ export default function Rooms() {
                   </div>
                   <p className="mt-4 text-sm leading-7 text-ivory/75">{selectedRoom.description}</p>
                   <div className="mt-4 grid gap-3 text-sm text-ivory/75">
-                    <div>Bedrooms: {selectedRoom.bedrooms || 1}</div>
-                    <div>Beds: {selectedRoom.beds || 1}</div>
-                    <div>Maximum Guests: {selectedRoom.maxGuests || selectedRoom.capacity || 2}</div>
-                    <div>Available Rooms: {selectedRoom.availableRooms || 0} / {selectedRoom.totalRooms || 1}</div>
+                    <div>Available Rooms: {getAvailabilityLabel(selectedRoom)}</div>
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-midnight/70 p-5">
