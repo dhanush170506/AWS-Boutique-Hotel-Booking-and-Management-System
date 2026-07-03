@@ -1,9 +1,8 @@
 const { PublishCommand, SNSClient } = require("@aws-sdk/client-sns");
 
-const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
-const TOPIC_ARN =
-  process.env.SNS_TOPIC_ARN ||
-  "arn:aws:sns:us-east-1:840868617113:HotelBookingNotifications";
+const REGION =
+  process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
+const TOPIC_ARN = process.env.SNS_TOPIC_ARN;
 
 const snsClient = new SNSClient({ region: REGION });
 
@@ -22,7 +21,9 @@ function buildBookingConfirmationMessage(booking) {
 
 async function publishBookingConfirmation(booking) {
   if (!TOPIC_ARN) {
-    console.warn("SNS_TOPIC_ARN is not configured. Skipping booking notification.");
+    console.warn(
+      "SNS_TOPIC_ARN is not configured. Skipping booking notification.",
+    );
     return null;
   }
 

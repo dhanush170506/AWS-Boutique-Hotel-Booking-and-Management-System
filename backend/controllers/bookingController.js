@@ -1,6 +1,7 @@
 const BookingStore = require("../models/BookingStore");
 const RoomStore = require("../models/RoomStore");
 const { publishBookingConfirmation } = require("../services/sns");
+const { invokeBookingLambda } = require("../services/lambda");
 
 const store = new BookingStore();
 const roomStore = new RoomStore();
@@ -75,11 +76,9 @@ async function createBooking(req, res, next) {
       return res.status(404).json({ message: "Selected room not found." });
     }
     if (Number(room.availableRooms || 0) <= 0) {
-      return res
-        .status(400)
-        .json({
-          message: "Selected room is fully booked for the selected dates.",
-        });
+      return res.status(400).json({
+        message: "Selected room is fully booked for the selected dates.",
+      });
     }
 
     const booking = await store.create({
@@ -89,6 +88,11 @@ async function createBooking(req, res, next) {
       roomName: room.roomName || room.name || room.roomType,
       roomPrice: room.price,
     });
+    try {
+      await invokeBookingLambda(booking);
+    } catch (lambdaError) {
+      console.error("Failed to invoke Lambda:", lambdaError);
+    }
     await roomStore.updateAvailability(room.roomId, false);
 
     try {
@@ -173,6 +177,11 @@ async function updateBooking(req, res, next) {
       ...req.body,
       userId: booking.userId,
     });
+    try {
+      await publishBookingConfirmation(updated);
+    } catch (snsError) {
+      console.error("SNS Error:", snsError);
+    }
     if (!updated) {
       return res.status(404).json({ message: "Booking not found." });
     }
@@ -216,6 +225,11 @@ async function deleteBooking(req, res, next) {
     }
     if (existing.roomId && existing.bookingStatus !== "Cancelled") {
       await roomStore.updateAvailability(existing.roomId, true);
+    }
+    try {
+      await publishBookingConfirmation(booking);
+    } catch (snsError) {
+      console.error("SNS Error:", snsError);
     }
     res.json(booking);
   } catch (error) {
