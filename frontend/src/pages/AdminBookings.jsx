@@ -74,7 +74,7 @@ export default function AdminBookings() {
             {filtered.map((booking) => {
               const checkIn = new Date(booking.checkInDate);
               const checkOut = new Date(booking.checkOutDate);
-              const totalNights = checkIn && checkOut ? Math.max(0, Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24)) : 0;
+              const totalNights = checkIn && checkOut? Math.max(0, Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24))): 0;
               const roomPrice = Number(booking.roomPrice || 0);
               const totalPrice = roomPrice * totalNights;
               return (
