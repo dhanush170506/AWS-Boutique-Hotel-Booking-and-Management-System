@@ -1,30 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Pencil, CheckCircle, XCircle } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
 import LoadingButton from '../components/LoadingButton';
 import { adminApi } from '../services/api';
 
 const emptyRoom = {
   roomNumber: '',
-  name: '',
+  roomName: '',
   roomType: '',
   description: '',
   price: '',
   totalRooms: '',
   availableRooms: '',
-  capacity: '',
-  bedType: '',
-  roomSize: '',
-  floor: '',
-  view: '',
-  smoking: 'No',
-  breakfast: false,
-  tv: false,
-  wifi: false,
-  ac: false,
-  balcony: false,
-  amenities: '',
-  images: '',
+  bedrooms: '',
+  beds: '',
+  maxGuests: '',
+  status: 'Available',
+  facilities: '',
+  imageUrls: '',
 };
 
 export default function AdminRooms() {
@@ -42,25 +35,18 @@ export default function AdminRooms() {
     setSelectedRoom(room);
     setForm({
       roomNumber: room.roomNumber || '',
-      name: room.name || '',
+      roomName: room.roomName || room.name || '',
       roomType: room.roomType || '',
       description: room.description || '',
       price: String(room.price || ''),
       totalRooms: String(room.totalRooms || ''),
       availableRooms: String(room.availableRooms || ''),
-      capacity: String(room.capacity || ''),
-      bedType: room.bedType || '',
-      roomSize: room.roomSize || '',
-      floor: room.floor || '',
-      view: room.view || '',
-      smoking: room.smoking || 'No',
-      breakfast: !!room.breakfast,
-      tv: !!room.tv,
-      wifi: !!room.wifi,
-      ac: !!room.ac,
-      balcony: !!room.balcony,
-      amenities: (room.amenities || []).join(', '),
-      images: (room.images || []).join(', '),
+      bedrooms: String(room.bedrooms || ''),
+      beds: String(room.beds || ''),
+      maxGuests: String(room.maxGuests || room.capacity || ''),
+      status: room.status || (Number(room.availableRooms || 0) > 0 ? 'Available' : 'Booked Out'),
+      facilities: (room.facilities || room.amenities || []).join(', '),
+      imageUrls: (room.imageUrls || room.images || []).join(', '),
     });
     setError('');
   }
@@ -72,32 +58,28 @@ export default function AdminRooms() {
 
   async function saveRoom(event) {
     event.preventDefault();
-    if (!form.name.trim() || !form.price || !form.totalRooms) {
-      setError('Name, price, and total rooms are required.');
+    if (!form.roomName.trim() || !form.price || !form.totalRooms) {
+      setError('Room name, price, and total rooms are required.');
       return;
     }
 
     const payload = {
       roomNumber: form.roomNumber.trim(),
-      name: form.name.trim(),
+      roomName: form.roomName.trim(),
+      name: form.roomName.trim(),
       roomType: form.roomType.trim(),
       description: form.description.trim(),
       price: Number(form.price),
       totalRooms: Number(form.totalRooms),
       availableRooms: Number(form.availableRooms || form.totalRooms),
-      capacity: Number(form.capacity || 1),
-      bedType: form.bedType,
-      roomSize: form.roomSize,
-      floor: form.floor,
-      view: form.view,
-      smoking: form.smoking,
-      breakfast: form.breakfast,
-      tv: form.tv,
-      wifi: form.wifi,
-      ac: form.ac,
-      balcony: form.balcony,
-      amenities: form.amenities.split(',').map((item) => item.trim()).filter(Boolean),
-      images: form.images.split(',').map((item) => item.trim()).filter(Boolean),
+      bedrooms: Number(form.bedrooms || 1),
+      beds: Number(form.beds || 1),
+      maxGuests: Number(form.maxGuests || 2),
+      status: form.status,
+      facilities: form.facilities.split(',').map((item) => item.trim()).filter(Boolean),
+      amenities: form.facilities.split(',').map((item) => item.trim()).filter(Boolean),
+      imageUrls: form.imageUrls.split(',').map((item) => item.trim()).filter(Boolean),
+      images: form.imageUrls.split(',').map((item) => item.trim()).filter(Boolean),
     };
 
     try {
@@ -132,8 +114,8 @@ export default function AdminRooms() {
 
   return (
     <div className="rounded-3xl border border-white/10 bg-charcoal p-8">
-      <SectionTitle eyebrow="Room management" title="Manage Hotel Rooms" description="Add, edit, and configure room inventory with capacity and room details." />
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_420px]">
+      <SectionTitle eyebrow="Room management" title="Manage Hotel Rooms" description="Add, edit, and configure room inventory with modern hotel metadata." />
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_460px]">
         <div className="overflow-x-auto rounded-3xl border border-white/10 bg-midnight p-4">
           <table className="min-w-full border-collapse text-left text-sm">
             <thead>
@@ -143,19 +125,17 @@ export default function AdminRooms() {
                 <th className="py-4 pr-6">Price</th>
                 <th className="py-4 pr-6">Available</th>
                 <th className="py-4 pr-6">Total</th>
-                <th className="py-4 pr-6">Status</th>
                 <th className="py-4 pr-6">Actions</th>
               </tr>
             </thead>
             <tbody>
               {roomRows.map((room) => (
                 <tr key={room.roomId} className="border-b border-white/10 text-ivory/80">
-                  <td className="py-4 pr-6">{room.roomNumber} / {room.name}</td>
+                  <td className="py-4 pr-6">{room.roomNumber} / {room.roomName || room.name}</td>
                   <td className="py-4 pr-6">{room.roomType}</td>
-                  <td className="py-4 pr-6">₹{room.price.toLocaleString('en-IN')}</td>
+                  <td className="py-4 pr-6">₹{Number(room.price || 0).toLocaleString('en-IN')}</td>
                   <td className="py-4 pr-6">{room.availableRooms}</td>
                   <td className="py-4 pr-6">{room.totalRooms}</td>
-                  <td className="py-4 pr-6">{room.available ? 'Enabled' : 'Disabled'}</td>
                   <td className="py-4 pr-6 space-x-2">
                     <button className="btn-secondary" onClick={() => editRoom(room)}>Edit</button>
                     <button className="btn-secondary border-red-400/25 text-red-100 hover:bg-red-500" onClick={() => deleteRoom(room.roomId)}>Delete</button>
@@ -181,76 +161,37 @@ export default function AdminRooms() {
             {[
               ['Room Number', 'roomNumber'],
               ['Room Type', 'roomType'],
-              ['Name', 'name'],
+              ['Room Name', 'roomName'],
               ['Description', 'description'],
               ['Price', 'price'],
               ['Total Rooms', 'totalRooms'],
               ['Available Rooms', 'availableRooms'],
-              ['Capacity', 'capacity'],
-              ['Bed Type', 'bedType'],
-              ['Room Size', 'roomSize'],
-              ['Floor', 'floor'],
-              ['View', 'view'],
+              ['Bedrooms', 'bedrooms'],
+              ['Beds', 'beds'],
+              ['Max Guests', 'maxGuests'],
+              ['Status', 'status'],
             ].map(([label, key]) => (
               <label key={key}>
                 <span className="label">{label}</span>
-                <input
-                  className="field"
-                  type={['price', 'totalRooms', 'availableRooms', 'capacity'].includes(key) ? 'number' : 'text'}
-                  value={form[key]}
-                  onChange={(event) => updateField(key, event.target.value)}
-                />
+                {key === 'status' ? (
+                  <select className="field" value={form[key]} onChange={(event) => updateField(key, event.target.value)}>
+                    <option value="Available">Available</option>
+                    <option value="Booked Out">Booked Out</option>
+                    <option value="Maintenance">Maintenance</option>
+                  </select>
+                ) : (
+                  <input className="field" type={['price', 'totalRooms', 'availableRooms', 'bedrooms', 'beds', 'maxGuests'].includes(key) ? 'number' : 'text'} value={form[key]} onChange={(event) => updateField(key, event.target.value)} />
+                )}
               </label>
             ))}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label>
-                <span className="label">Smoking</span>
-                <select className="field" value={form.smoking} onChange={(event) => updateField('smoking', event.target.value)}>
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </label>
-              <label>
-                <span className="label">Breakfast</span>
-                <input type="checkbox" checked={form.breakfast} onChange={(event) => updateField('breakfast', event.target.checked)} className="mr-3" />
-                Enabled
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label>
-                <span className="label">TV</span>
-                <input type="checkbox" checked={form.tv} onChange={(event) => updateField('tv', event.target.checked)} className="mr-3" />
-                Enabled
-              </label>
-              <label>
-                <span className="label">WiFi</span>
-                <input type="checkbox" checked={form.wifi} onChange={(event) => updateField('wifi', event.target.checked)} className="mr-3" />
-                Enabled
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label>
-                <span className="label">AC</span>
-                <input type="checkbox" checked={form.ac} onChange={(event) => updateField('ac', event.target.checked)} className="mr-3" />
-                Enabled
-              </label>
-              <label>
-                <span className="label">Balcony</span>
-                <input type="checkbox" checked={form.balcony} onChange={(event) => updateField('balcony', event.target.checked)} className="mr-3" />
-                Enabled
-              </label>
-            </div>
-
             <label>
-              <span className="label">Amenities (comma separated)</span>
-              <input className="field" value={form.amenities} onChange={(event) => updateField('amenities', event.target.value)} />
+              <span className="label">Facilities (comma separated)</span>
+              <input className="field" value={form.facilities} onChange={(event) => updateField('facilities', event.target.value)} />
             </label>
             <label>
-              <span className="label">Images (comma separated URLs)</span>
-              <input className="field" value={form.images} onChange={(event) => updateField('images', event.target.value)} />
+              <span className="label">Image URLs (comma separated)</span>
+              <input className="field" value={form.imageUrls} onChange={(event) => updateField('imageUrls', event.target.value)} />
             </label>
           </div>
 

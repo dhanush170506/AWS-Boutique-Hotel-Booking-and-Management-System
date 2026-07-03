@@ -74,16 +74,19 @@ async function createBooking(req, res, next) {
     if (!room) {
       return res.status(404).json({ message: "Selected room not found." });
     }
-    if (room.available === false) {
+    if (Number(room.availableRooms || 0) <= 0) {
       return res
         .status(400)
-        .json({ message: "Selected room is not available." });
+        .json({
+          message: "Selected room is fully booked for the selected dates.",
+        });
     }
 
     const booking = await store.create({
       ...payload,
       roomId: room.roomId,
-      roomType: room.name,
+      roomType: room.roomName || room.name || room.roomType,
+      roomName: room.roomName || room.name || room.roomType,
       roomPrice: room.price,
     });
     await roomStore.updateAvailability(room.roomId, false);
@@ -211,7 +214,7 @@ async function deleteBooking(req, res, next) {
     if (!booking) {
       return res.status(404).json({ message: "Booking not found." });
     }
-    if (existing.roomId) {
+    if (existing.roomId && existing.bookingStatus !== "Cancelled") {
       await roomStore.updateAvailability(existing.roomId, true);
     }
     res.json(booking);

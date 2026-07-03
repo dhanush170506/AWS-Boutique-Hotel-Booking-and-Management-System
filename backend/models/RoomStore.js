@@ -6,15 +6,75 @@ const {
 const { v4: uuidv4 } = require("uuid");
 const { docClient, scanAll, tables } = require("../services/dynamoDb");
 
+function normalizeStringList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function getStatus(room) {
+  const totalRooms = Number(room.totalRooms || room.capacity || 1);
+  const availableRooms = Number(
+    room.availableRooms ?? room.available ?? totalRooms,
+  );
+  if (availableRooms <= 0) return "Booked Out";
+  if (availableRooms === 1) return "Only 1 Room Left";
+  return "Available";
+}
+
+function normalizeRoom(room) {
+  if (!room) return null;
+
+  const totalRooms = Number(room.totalRooms ?? room.capacity ?? 1);
+  const availableRooms = Number(
+    room.availableRooms ?? room.available ?? totalRooms,
+  );
+  const normalized = {
+    ...room,
+    roomId: room.roomId || room.id,
+    name: room.roomName || room.name || room.roomType || "Room",
+    roomName: room.roomName || room.name || room.roomType || "Room",
+    roomType: room.roomType || room.name || "Deluxe Room",
+    roomNumberPrefix: room.roomNumberPrefix || room.roomNumber || "",
+    description: room.description || "",
+    bedrooms: Number(room.bedrooms ?? room.bedCount ?? 1),
+    beds: Number(room.beds ?? 1),
+    maxGuests: Number(room.maxGuests ?? room.capacity ?? 1),
+    price: Number(room.price || 0),
+    totalRooms,
+    availableRooms: Math.min(totalRooms, Math.max(0, availableRooms)),
+    facilities: normalizeStringList(room.facilities ?? room.amenities),
+    imageUrls: normalizeStringList(room.imageUrls ?? room.images),
+    status: room.status || getStatus({ ...room, totalRooms, availableRooms }),
+    available: availableRooms > 0,
+    createdAt: room.createdAt || new Date().toISOString(),
+    updatedAt: room.updatedAt || room.createdAt || new Date().toISOString(),
+  };
+
+  normalized.occupiedRooms = Math.max(
+    0,
+    totalRooms - normalized.availableRooms,
+  );
+  return normalized;
+}
+
 class RoomStore {
   constructor(tableName = tables.rooms) {
     this.tableName = tableName;
   }
 
   async findAll() {
-    return scanAll({
+    const rooms = await scanAll({
       TableName: this.tableName,
     });
+    return rooms.map(normalizeRoom).filter(Boolean);
   }
 
   async findById(roomId) {
@@ -24,19 +84,17 @@ class RoomStore {
         Key: { roomId },
       }),
     );
-    return result.Item || null;
+    return normalizeRoom(result.Item);
   }
 
   async findByName(name) {
     if (!name) return null;
     const normalizedName = name.trim().toLowerCase();
-    const rooms = await scanAll({
-      TableName: this.tableName,
-      FilterExpression: "contains (lower(#name), :name)",
-      ExpressionAttributeNames: { "#name": "name" },
-      ExpressionAttributeValues: { ":name": normalizedName },
-    });
+    const rooms = await this.findAll();
     return (
+      rooms.find(
+        (room) => room.roomName?.trim().toLowerCase() === normalizedName,
+      ) ||
       rooms.find(
         (room) => room.name?.trim().toLowerCase() === normalizedName,
       ) ||
@@ -47,39 +105,30 @@ class RoomStore {
 
   async create(payload) {
     const roomId = `ROOM-${uuidv4().slice(0, 8).toUpperCase()}`;
-    const totalRooms = Number(payload.totalRooms || payload.capacity || 1);
+    const totalRooms = Number(payload.totalRooms ?? payload.capacity ?? 1);
     const availableRooms = Number(
       payload.availableRooms !== undefined
         ? payload.availableRooms
         : totalRooms,
     );
-    const room = {
+    const room = normalizeRoom({
       roomId,
-      roomNumber:
-        payload.roomNumber || `${Math.floor(Math.random() * 900) + 100}`,
-      name: payload.name,
-      roomType: payload.roomType || payload.name,
+      roomNumberPrefix: payload.roomNumberPrefix || payload.roomNumber || "",
+      roomName: payload.roomName || payload.name || payload.roomType || "Room",
+      roomType: payload.roomType || payload.name || "Deluxe Room",
       description: payload.description || "",
-      price: Number(payload.price) || 0,
-      capacity: Number(payload.capacity) || 1,
-      bedType: payload.bedType || "King Bed",
-      roomSize: payload.roomSize || "Standard",
-      floor: payload.floor || "Ground",
-      view: payload.view || "City",
-      smoking: payload.smoking || "No",
-      breakfast: Boolean(payload.breakfast),
-      tv: Boolean(payload.tv),
-      wifi: Boolean(payload.wifi),
-      ac: Boolean(payload.ac),
-      balcony: Boolean(payload.balcony),
-      amenities: payload.amenities || [],
-      images: payload.images || [],
+      bedrooms: Number(payload.bedrooms ?? 1),
+      beds: Number(payload.beds ?? 1),
+      maxGuests: Number(payload.maxGuests ?? payload.capacity ?? 1),
+      price: Number(payload.price || 0),
+      facilities: payload.facilities ?? payload.amenities,
+      imageUrls: payload.imageUrls ?? payload.images,
       totalRooms,
       availableRooms: Math.min(totalRooms, Math.max(0, availableRooms)),
-      available:
-        payload.available !== undefined ? Boolean(payload.available) : true,
+      available: availableRooms > 0,
       createdAt: new Date().toISOString(),
-    };
+      updatedAt: new Date().toISOString(),
+    });
 
     await docClient.send(
       new PutCommand({
@@ -100,40 +149,43 @@ class RoomStore {
       payload.totalRooms !== undefined
         ? Number(payload.totalRooms)
         : existing.totalRooms || existing.capacity || 1;
-    const occupiedRooms =
-      (existing.totalRooms || 0) - (existing.availableRooms || 0);
+    const occupiedRooms = Math.max(
+      0,
+      Number(existing.totalRooms || 0) - Number(existing.availableRooms || 0),
+    );
     const recalculatedAvailableRooms = Math.max(0, totalRooms - occupiedRooms);
 
-    const updated = {
+    const updated = normalizeRoom({
       ...existing,
-      roomNumber: payload.roomNumber || existing.roomNumber,
-      name: payload.name?.trim() || existing.name,
+      ...payload,
+      roomId,
+      roomName: payload.roomName?.trim() || existing.roomName || existing.name,
       roomType: payload.roomType || existing.roomType || existing.name,
+      roomNumberPrefix:
+        payload.roomNumberPrefix ??
+        existing.roomNumberPrefix ??
+        existing.roomNumber,
       description: payload.description ?? existing.description,
+      bedrooms:
+        payload.bedrooms !== undefined
+          ? Number(payload.bedrooms)
+          : existing.bedrooms || 1,
+      beds:
+        payload.beds !== undefined ? Number(payload.beds) : existing.beds || 1,
+      maxGuests:
+        payload.maxGuests !== undefined
+          ? Number(payload.maxGuests)
+          : (existing.maxGuests ?? existing.capacity ?? 1),
       price:
         payload.price !== undefined ? Number(payload.price) : existing.price,
-      capacity:
-        payload.capacity !== undefined
-          ? Number(payload.capacity)
-          : existing.capacity,
-      bedType: payload.bedType || existing.bedType,
-      roomSize: payload.roomSize || existing.roomSize,
-      floor: payload.floor || existing.floor,
-      view: payload.view || existing.view,
-      smoking: payload.smoking || existing.smoking,
-      breakfast:
-        payload.breakfast !== undefined
-          ? Boolean(payload.breakfast)
-          : existing.breakfast,
-      tv: payload.tv !== undefined ? Boolean(payload.tv) : existing.tv,
-      wifi: payload.wifi !== undefined ? Boolean(payload.wifi) : existing.wifi,
-      ac: payload.ac !== undefined ? Boolean(payload.ac) : existing.ac,
-      balcony:
-        payload.balcony !== undefined
-          ? Boolean(payload.balcony)
-          : existing.balcony,
-      amenities: payload.amenities || existing.amenities,
-      images: payload.images || existing.images || [],
+      facilities:
+        payload.facilities !== undefined
+          ? normalizeStringList(payload.facilities)
+          : existing.facilities,
+      imageUrls:
+        payload.imageUrls !== undefined
+          ? normalizeStringList(payload.imageUrls)
+          : existing.imageUrls,
       totalRooms,
       availableRooms:
         payload.availableRooms !== undefined
@@ -144,7 +196,7 @@ class RoomStore {
           ? Boolean(payload.available)
           : existing.available,
       updatedAt: new Date().toISOString(),
-    };
+    });
 
     await docClient.send(
       new PutCommand({
@@ -183,12 +235,12 @@ class RoomStore {
       availableRooms = Math.min(totalRooms, availableRooms + 1);
     }
 
-    const updated = {
+    const updated = normalizeRoom({
       ...room,
       availableRooms,
-      available: room.available !== false,
+      available: availableRooms > 0,
       updatedAt: new Date().toISOString(),
-    };
+    });
 
     await docClient.send(
       new PutCommand({

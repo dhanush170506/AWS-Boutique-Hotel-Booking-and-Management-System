@@ -12,7 +12,7 @@ const initialForm = {
   checkInDate: "",
   checkOutDate: "",
   guests: "1",
-  roomType: "Deluxe Room",
+  roomType: "",
   bedPreference: "King Bed",
   airportPickup: false,
   specialRequests: ""
@@ -22,7 +22,7 @@ export default function Booking() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const selectedRoom = params.get("room");
+  const selectedRoomParam = params.get("room");
   const [rooms, setRooms] = useState([]);
   const [form, setForm] = useState({
     ...initialForm,
@@ -30,7 +30,7 @@ export default function Booking() {
     email: user?.email || "",
     phone: user?.phone || "",
     roomId: "",
-    roomType: selectedRoom || "",
+    roomType: selectedRoomParam || "",
     roomPrice: 0,
     bedPreference: user?.preferences?.bedPreference || "King Bed",
     airportPickup: Boolean(user?.preferences?.airportPickup)
@@ -42,31 +42,21 @@ export default function Booking() {
   useEffect(() => {
     roomApi.list().then((result) => {
       setRooms(result);
-      if (!selectedRoom && result.length) {
-        const firstRoom = result.find((room) => room.available) || result[0];
-        if (!form.roomType || form.roomType === "") {
-          setForm((current) => ({
-            ...current,
-            roomId: firstRoom?.roomId || "",
-            roomType: firstRoom?.name || "",
-            roomPrice: firstRoom?.price || 0,
-          }));
-        }
-      }
-      if (selectedRoom) {
-        const match = result.find((room) => room.name === selectedRoom);
-        if (match) {
-          setForm((current) => ({
-            ...current,
-            roomId: match.roomId,
-            roomPrice: match.price,
-          }));
-        }
+      const availableRooms = result.filter((room) => Number(room.availableRooms || 0) > 0);
+      if (availableRooms.length) {
+        const firstRoom = availableRooms.find((room) => (selectedRoomParam ? (room.roomName || room.name) === selectedRoomParam : true)) || availableRooms[0];
+        setForm((current) => ({
+          ...current,
+          roomId: current.roomId || firstRoom?.roomId || "",
+          roomType: current.roomType || firstRoom?.roomName || firstRoom?.name || "",
+          roomPrice: current.roomPrice || firstRoom?.price || 0,
+        }));
       }
     }).catch(() => setApiError("Unable to load available rooms."));
-  }, [selectedRoom]);
+  }, [selectedRoomParam]);
 
-  const roomOptions = useMemo(() => rooms.filter((room) => room.available), [rooms]);
+  const roomOptions = useMemo(() => rooms.filter((room) => Number(room.availableRooms || 0) > 0), [rooms]);
+  const selectedRoom = useMemo(() => roomOptions.find((room) => room.roomId === form.roomId) || roomOptions.find((room) => (room.roomName || room.name) === form.roomType) || null, [form.roomId, form.roomType, roomOptions]);
 
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -81,6 +71,7 @@ export default function Booking() {
     if (!form.checkInDate) nextErrors.checkInDate = "Check-in date is required.";
     if (!form.checkOutDate) nextErrors.checkOutDate = "Check-out date is required.";
     if (Number(form.guests) < 1) nextErrors.guests = "At least one guest is required.";
+    if (!form.roomId) nextErrors.roomType = "Please select a room.";
     if (form.checkInDate && form.checkOutDate && new Date(form.checkOutDate) <= new Date(form.checkInDate)) {
       nextErrors.checkOutDate = "Check-out must be after check-in.";
     }
@@ -106,11 +97,21 @@ export default function Booking() {
 
   return (
     <section className="page-shell py-16">
-      <SectionTitle
-        eyebrow="Reservations"
-        title="Book Your Boutique Stay"
-        description="Complete the reservation request and receive a unique booking ID instantly."
-      />
+      <SectionTitle eyebrow="Reservations" title="Book Your Boutique Stay" description="Reserve your preferred suite with flexible dates, guest counts, and a clear booking summary." />
+
+      <div className="mx-auto mb-8 max-w-5xl rounded-[2rem] border border-white/10 bg-charcoal p-6 luxury-border">
+        <p className="text-sm uppercase tracking-[0.2em] text-champagne">Booking summary</p>
+        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="font-display text-2xl text-ivory">{selectedRoom ? selectedRoom.roomName || selectedRoom.name : "Choose your room"}</h2>
+            <p className="mt-2 text-sm text-ivory/70">{selectedRoom ? `${selectedRoom.roomType} • ${selectedRoom.maxGuests || selectedRoom.capacity || 2} guests max` : "Select an available room to continue."}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-midnight/70 px-4 py-3 text-sm text-ivory/75">
+            <div className="font-semibold text-champagne">₹{Number(selectedRoom?.price || form.roomPrice || 0).toLocaleString("en-IN")}</div>
+            <div>per night</div>
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="mx-auto max-w-5xl bg-charcoal p-6 luxury-border md:p-8">
         {apiError && <div className="mb-6 border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-100">{apiError}</div>}
@@ -133,9 +134,9 @@ export default function Booking() {
           <Field label="Check-out Date" error={errors.checkOutDate}>
             <input className="field" type="date" value={form.checkOutDate} onChange={(e) => updateField("checkOutDate", e.target.value)} />
           </Field>
-          <Field label="Room Type">
+          <Field label="Room Type" error={errors.roomType}>
             <select className="field" value={form.roomType} onChange={(e) => {
-              const selected = rooms.find((room) => room.name === e.target.value);
+              const selected = rooms.find((room) => (room.roomName || room.name) === e.target.value);
               updateField("roomType", e.target.value);
               if (selected) {
                 updateField("roomId", selected.roomId);
@@ -143,7 +144,7 @@ export default function Booking() {
               }
             }}>
               {roomOptions.map((room) => (
-                <option key={room.roomId} value={room.name}>{room.name}</option>
+                <option key={room.roomId} value={room.roomName || room.name}>{room.roomName || room.name}</option>
               ))}
             </select>
           </Field>
@@ -156,29 +157,14 @@ export default function Booking() {
             </select>
           </Field>
           <label className="flex items-center gap-3 border border-white/10 p-4 text-sm text-ivory/78 md:col-span-2">
-            <input
-              type="checkbox"
-              checked={form.airportPickup}
-              onChange={(e) => updateField("airportPickup", e.target.checked)}
-              className="h-5 w-5 accent-champagne"
-            />
+            <input type="checkbox" checked={form.airportPickup} onChange={(e) => updateField("airportPickup", e.target.checked)} className="h-5 w-5 accent-champagne" />
             Add private airport pickup
           </label>
           <Field label="Special Requests" className="md:col-span-2">
-            <textarea
-              className="field min-h-32"
-              value={form.specialRequests}
-              onChange={(e) => updateField("specialRequests", e.target.value)}
-              placeholder="Dietary preferences, celebration setup, arrival time..."
-            />
+            <textarea className="field min-h-32" value={form.specialRequests} onChange={(e) => updateField("specialRequests", e.target.value)} placeholder="Dietary preferences, celebration setup, arrival time..." />
           </Field>
-          {apiError === "Unable to load available rooms." && (
-            <div className="md:col-span-2 text-sm text-red-200">Only existing room IDs are available for booking.</div>
-          )}
         </div>
-        <LoadingButton loading={loading} type="submit" className="mt-7 w-full md:w-auto">
-          Confirm Booking
-        </LoadingButton>
+        <LoadingButton loading={loading} type="submit" className="mt-7 w-full md:w-auto">Confirm Booking</LoadingButton>
       </form>
     </section>
   );

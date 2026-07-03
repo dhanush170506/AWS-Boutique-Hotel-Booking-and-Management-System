@@ -102,8 +102,8 @@ export const authApi = {
 };
 
 export const userApi = {
-  profile: (userId) => api.get("/users/profile").then((res) => res.data),
-  updateProfile: (userId, payload) =>
+  profile: () => api.get("/users/profile").then((res) => res.data),
+  updateProfile: (payload) =>
     api.put("/users/profile", payload).then((res) => res.data),
 };
 
@@ -145,6 +145,8 @@ export const adminApi = {
     api.put(`/admin/rooms/${roomId}`, payload).then((res) => res.data),
   deleteRoom: (roomId) =>
     api.delete(`/admin/rooms/${roomId}`).then((res) => res.data),
+  uploadImage: (payload) =>
+    api.post("/admin/rooms/upload-image", payload).then((res) => res.data),
 };
 
 export default api;

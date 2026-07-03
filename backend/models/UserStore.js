@@ -119,6 +119,7 @@ class UserStore {
       fullName: payload.fullName?.trim() || existing.fullName,
       phone: payload.phone?.trim() || existing.phone,
       role: updatedRole,
+      password: payload.password || existing.password,
       preferences: {
         ...existing.preferences,
         ...(payload.preferences || {}),

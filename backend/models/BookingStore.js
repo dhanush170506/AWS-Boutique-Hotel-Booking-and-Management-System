@@ -48,6 +48,7 @@ class BookingStore {
       phone: payload.phone,
       roomId: payload.roomId || null,
       roomType: payload.roomType,
+      roomName: payload.roomName || payload.roomType,
       roomPrice:
         payload.roomPrice !== undefined ? Number(payload.roomPrice) : null,
       guests: Number(payload.guests),
@@ -56,7 +57,8 @@ class BookingStore {
       bedPreference: payload.bedPreference,
       airportPickup: Boolean(payload.airportPickup),
       specialRequests: payload.specialRequests || "",
-      bookingStatus: "Confirmed",
+      bookingStatus: payload.bookingStatus || "Confirmed",
+      paymentStatus: payload.paymentStatus || "Pending",
       createdAt: new Date().toISOString(),
     };
 
@@ -85,6 +87,7 @@ class BookingStore {
       userId: existing.userId,
       roomId: payload.roomId || existing.roomId,
       roomType: payload.roomType || existing.roomType,
+      roomName: payload.roomName || existing.roomName || existing.roomType,
       roomPrice:
         payload.roomPrice !== undefined
           ? Number(payload.roomPrice)
